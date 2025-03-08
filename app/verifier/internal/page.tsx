@@ -1,28 +1,31 @@
 "use client";
 import { useState, useEffect } from "react";
-import { setVerificationAttributes, setCredentialDefinitionId } from "@/app/api/presentproof/verifierApi/sendProofRequest";
 
 export default function ProofRequestPage() {
     const [credDefId, setCredDefId] = useState("");
     const [attributes, setAttributes] = useState<string[]>([]);
     const [tempSelectedAttributes, setTempSelectedAttributes] = useState<string[]>([]);
     const [selectedAttributes, setSelectedAttributes] = useState<string[]>([]);
-    
-    // Load saved attributes and credDefId on page load
+
+    // Load saved attributes and credDefId from the database
     useEffect(() => {
-        const savedAttributes = localStorage.getItem("selectedAttributes");
-        const savedCredDefId = localStorage.getItem("credDefId");
-        
-        if (savedAttributes) {
-            const parsedAttributes = JSON.parse(savedAttributes);
-            setSelectedAttributes(parsedAttributes);
-            setTempSelectedAttributes(parsedAttributes);
+        async function fetchSavedConfig() {
+            try {
+                const response = await fetch("/api/databasesApi/dbProofConfig?label=Verifier1"); // Fetch based on label
+                if (!response.ok) throw new Error("Failed to fetch config");
+                const data = await response.json();
+
+                if (data && data.length > 0) {
+                    const latestConfig = data[data.length - 1]; // Get the latest saved config
+                    setCredDefId(latestConfig.credDefId);
+                    setSelectedAttributes(latestConfig.attributes);
+                    setTempSelectedAttributes(latestConfig.attributes);
+                }
+            } catch (error) {
+                console.error("Error fetching saved config:", error);
+            }
         }
-        
-        if (savedCredDefId) {
-            setCredDefId(savedCredDefId);
-            setCredentialDefinitionId(savedCredDefId); // Ensure it's set in API
-        }
+        fetchSavedConfig();
     }, []);
 
     async function fetchAttributes() {
@@ -33,9 +36,7 @@ export default function ProofRequestPage() {
 
         try {
             const response = await fetch(`http://localhost:11002/credential-definitions/${credDefId}`);
-            if (!response.ok) {
-                throw new Error(`HTTP error! Status: ${response.status}`);
-            }
+            if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
             const data = await response.json();
 
             if (!data || typeof data !== "object" || !data.credential_definition) {
@@ -45,10 +46,6 @@ export default function ProofRequestPage() {
             const credentialDefinition = data.credential_definition.value.primary.r;
             const fetchedAttributes = Object.keys(credentialDefinition);
             setAttributes(fetchedAttributes);
-            
-            // Save credDefId and set in API
-            localStorage.setItem("credDefId", credDefId);
-            setCredentialDefinitionId(credDefId);
         } catch (error) {
             console.error("Error fetching attributes:", error);
             alert("Failed to fetch attributes. Check console for details.");
@@ -57,19 +54,33 @@ export default function ProofRequestPage() {
 
     // Handle checkbox selection (temporary)
     const handleTempAttributeToggle = (attribute: string) => {
-        setTempSelectedAttributes((prev) => 
-            prev.includes(attribute) 
-                ? prev.filter(attr => attr !== attribute) 
+        setTempSelectedAttributes((prev) =>
+            prev.includes(attribute)
+                ? prev.filter(attr => attr !== attribute)
                 : [...prev, attribute]
         );
     };
 
-    // Set selected attributes when button is clicked
-    const confirmSelectedAttributes = () => {
-        setSelectedAttributes(tempSelectedAttributes);
-        localStorage.setItem("selectedAttributes", JSON.stringify(tempSelectedAttributes));
-        console.log(tempSelectedAttributes)
-        setVerificationAttributes(tempSelectedAttributes);
+    // Save selected attributes to the database
+    const confirmSelectedAttributes = async () => {
+        try {
+            const response = await fetch("/api/databasesApi/dbProofConfig", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    label: "Verifier1",
+                    credDefId,
+                    attributes: tempSelectedAttributes
+                }),
+            });
+
+            if (!response.ok) throw new Error("Failed to save config");
+
+            setSelectedAttributes(tempSelectedAttributes);
+        } catch (error) {
+            console.error("Error saving selected attributes:", error);
+            alert("Failed to save attributes. Check console for details.");
+        }
     };
 
     return (

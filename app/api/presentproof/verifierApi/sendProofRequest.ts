@@ -1,5 +1,3 @@
-const VERIFIER_URL = "http://localhost:11002"; 
-
 let storeAttributes: string[] = [];
 let storedCredDefId: string | null = null; // Store Credential Definition ID
 
@@ -22,6 +20,7 @@ export const getCredDefinitionId = () => {
 };
 
 export const sendProofRequest = async (
+    agentUrl: string,
     connectionId: string,
     proofRequestName: string,
 ) => {
@@ -62,7 +61,7 @@ export const sendProofRequest = async (
     };
 
     try {
-        const response = await fetch(`${VERIFIER_URL}/present-proof-2.0/send-request`, {
+        const response = await fetch(`${agentUrl}/present-proof-2.0/send-request`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(proofRequest),

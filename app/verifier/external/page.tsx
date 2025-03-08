@@ -51,7 +51,7 @@ const VerifierExternal: React.FC = () => {
             setConnectionId(connectionId);
             console.log(`🔗 Found connection ID: ${connectionId}`);
 
-            await sendProofRequest(connectionId, "Proof");
+            await sendProofRequest(VERIFIER_URL, connectionId, "Proof");
             window.postMessage({ type: "ARIES_PROOF_REQUEST" });
 
             const proofRecords = await getPresentProof(VERIFIER_URL);
@@ -88,7 +88,7 @@ const VerifierExternal: React.FC = () => {
             setProofState(proof.state);
 
             if (proof.state === "done") {
-              setIsVerified(proof.verified === "true"); 
+              setIsVerified(proof.verified === "true");
               console.log(`🔍 Proof verification status: ${proof.verified}`);
 
               if (proof.verified === "true") {

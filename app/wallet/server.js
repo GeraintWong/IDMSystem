@@ -6,6 +6,11 @@ import { createInvitation } from '../api/invitation/createInvitation.ts'; // Imp
 import { acceptInvitation } from '../api/invitation/acceptInvitation.ts'; // Import with .ts extension
 import { sendCredentialProposal } from '../api/issueCredentials/sendProposal/sendProposal.ts';
 import { sendPresentation } from '../api/presentproof/holderApi/sendPresentation.ts'
+import { extractText } from '../../lib/OCR.ts'
+
+import * as dotenv from 'dotenv';
+dotenv.config();
+import nodemailer from 'nodemailer'
 
 const ISSUER_URL = "http://localhost:11000"; 
 const HOLDER_URL = "http://localhost:11001"; 
@@ -264,6 +269,47 @@ app.post("/send-presentation", async (req, res) => {
         return res.status(500).json({ message: "Internal server error." });
     }
 });
+
+let otpStore = {};
+
+//Email type shiii
+const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,  
+    },
+  });
+
+  app.post("/send-otp", async (req, res) => {
+    const { email } = req.body;
+    const otp = Math.floor(100000 + Math.random() * 900000); // Generate 6-digit OTP
+    otpStore[email] = otp;
+  
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: "Your Verification Code",
+      text: `Your verification code is: ${otp}. It expires in 5 minutes.`,
+    };
+  
+    try {
+      await transporter.sendMail(mailOptions);
+      res.json({ message: "OTP sent successfully!" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to send OTP" });
+    }
+  });
+
+  app.post("/verify-otp", (req, res) => {
+    const { email, otp } = req.body;
+    if (otpStore[email] && otpStore[email] == otp) {
+      delete otpStore[email];
+      res.json({ message: "OTP verified. Proceed with agent creation." });
+    } else {
+      res.status(400).json({ error: "Invalid OTP" });
+    }
+  });
 
 
 app.listen(4000, () => console.log('Server running on port 4000'));

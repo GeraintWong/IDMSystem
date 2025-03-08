@@ -252,4 +252,5 @@ export const getWalletCredentialId = async (): Promise<{ referent: string; cred_
 
 
 
+
   
