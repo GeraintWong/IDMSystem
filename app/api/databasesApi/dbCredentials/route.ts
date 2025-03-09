@@ -11,9 +11,16 @@ export async function POST(req: Request) {
     }
 }
 
-export async function GET() {
+export async function GET(req: Request) {
     try {
-        const credentials = getCredentials();
+        const url = new URL(req.url);
+        const email = url.searchParams.get("email"); 
+                
+        let credentials = getCredentials();
+        if (email) {
+            credentials = credentials.filter((config: any) => config.email === email);
+        }
+
         return NextResponse.json(credentials);
     } catch (error) {
         return NextResponse.json({ error: "Failed to fetch credentials" }, { status: 500 });

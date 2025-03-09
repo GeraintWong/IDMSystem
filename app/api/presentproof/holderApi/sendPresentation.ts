@@ -66,7 +66,6 @@ export const sendPresentation = async (credentialId: string) => {
         });
 
         const textResponse = await response.text();
-        console.log("✅ Response:", textResponse);
 
         if (!response.ok) {
             throw new Error(`Failed to send presentation: ${textResponse}`);

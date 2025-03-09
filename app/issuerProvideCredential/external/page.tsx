@@ -5,6 +5,7 @@ import { createInvitation } from "@/app/api/invitation/createInvitation";
 import { Button } from "@/components/ui/button";
 import { fetchSchemaAndCredDefIds, getConnections, getPresentProof, deletePresentProof } from "@/app/api/helper/helper";
 import { sendProofRequest } from "@/app/api/presentproof/verifierApi/sendProofRequest";
+import { sendCredential } from "@/app/api/issueCredentials/sendCredential/sendCredential";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,6 +32,8 @@ const IssuerExternal: React.FC = () => {
   const [presExId, setPresExId] = useState<string | null>(null);
   const [proofState, setProofState] = useState<string | null>(null);
   const [isVerified, setIsVerified] = useState<boolean | null>(null);
+  const [selectedAttributes, setSelectedAttributes] = useState<string[]>([]);
+  const [proofCredDefId, setProofCredDefId] = useState("");
 
   useEffect(() => {
     const fetchData = async () => {
@@ -59,6 +62,7 @@ const IssuerExternal: React.FC = () => {
     try {
       const url = await createInvitation(ISSUER_URL);
       console.log("🎟️ Generated Invitation URL:", url);
+      window.postMessage({ type: "LOGIN_REQUEST" }, "*");
 
       if (url) {
         window.postMessage({ type: "ARIES_INVITATION", payload: url }, "*");
@@ -86,7 +90,14 @@ const IssuerExternal: React.FC = () => {
             setConnectionId(connectionId);
             console.log(`🔗 Found connection ID: ${connectionId}`);
 
-            await sendProofRequest(ISSUER_URL, connectionId, "Proof");
+            const getAttributesCredDefIdSpecific = await fetch("/api/databasesApi/dbProofConfig?label=Issuer2"); // Fetch based on label
+            if (!getAttributesCredDefIdSpecific.ok) throw new Error("Failed to fetch config");
+            const getAttributesCredDefId= await getAttributesCredDefIdSpecific.json();
+
+            if (getAttributesCredDefId && getAttributesCredDefId.length > 0) {
+              const latestConfig = getAttributesCredDefId[getAttributesCredDefId.length - 1]; // Get the latest saved config
+              await sendProofRequest(ISSUER_URL, connectionId, "Proof", latestConfig.attributes, latestConfig.credDefId);
+          }
             window.postMessage({ type: "ARIES_PROOF_REQUEST" });
 
             const proofRecords = await getPresentProof(ISSUER_URL);
@@ -129,8 +140,24 @@ const IssuerExternal: React.FC = () => {
               if (proof.verified === "true") {
                 console.log("✅ Proof verified! Redirecting...");
 
+                const userEmail = proof.by_format?.pres?.indy?.requested_proof?.revealed_attrs?.email?.raw;
+                console.log("here is the user's email", userEmail)
+
+                const getHolderInformation = await fetch(`/api/databasesApi/dbCredentials?email=${userEmail}`);
+                const userInformation = await getHolderInformation.json();
+                const fetchSchemaAndCred = await fetchSchemaAndCredDefIds(ISSUER_URL);
+                const fetchedCredDefId = fetchSchemaAndCred.credDefIds[0];
+                const holderConnectionId = proof.connection_id
+
+                if (!fetchedCredDefId) {
+                  console.error("Credential Definition ID is missing.");
+                  return;
+                }
+
+                await sendCredential(ISSUER_URL, holderConnectionId, userInformation[0].attributes, "", false, fetchSchemaAndCred.schemaDetails[0].schemaId, fetchedCredDefId, false);
+
                 // Delete proof record after successful verification
-                // await deletePresentProof(ISSUER_URL, presExId);
+                await deletePresentProof(ISSUER_URL, presExId);
               }
             }
           }
@@ -146,9 +173,6 @@ const IssuerExternal: React.FC = () => {
       if (interval) clearInterval(interval);
     };
   }, [presExId, proofState]);
-
-
-
 
   return (
     <div className="flex min-h-screen bg-gray-900 text-white p-6">

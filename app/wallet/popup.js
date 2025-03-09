@@ -40,6 +40,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 //Email type shiii
 document.getElementById("otpButton").addEventListener('click', async () => {
     const email = document.getElementById("emailInput").value;
+    document.getElementById("loadingOverlaySetupSection").classList.remove('d-none');
     const response = await fetch("http://localhost:4000/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -47,23 +48,47 @@ document.getElementById("otpButton").addEventListener('click', async () => {
     });
     const data = await response.json();
     console.log(data.message)
+    const maskedEmail = maskEmail(email)
     if (response.ok) {
         document.getElementById("otpSection").classList.remove('d-none');
         document.getElementById("setupSection").classList.add('d-none');
+        document.getElementById("loadingOverlaySetupSection").classList.add('d-none');
+        document.getElementById("otpSentText").innerHTML = "OTP was sent to " + maskedEmail;
+        const otpInputs = document.querySelectorAll(".otp-input");
+
+        otpInputs.forEach((input, index) => {
+            input.addEventListener("input", (e) => {
+                if (e.target.value && index < otpInputs.length - 1) {
+                    otpInputs[index + 1].focus();
+                }
+            });
+
+            input.addEventListener("keydown", (e) => {
+                if (e.key === "Backspace" && index > 0 && !e.target.value) {
+                    otpInputs[index - 1].focus();
+                }
+            });
+        });
     }
 })
 
 document.getElementById("verifyButton").addEventListener('click', async () => {
     const email = document.getElementById("emailInput").value;
-    const otp = document.getElementById("otp").value;
+    const otpInputs = document.querySelectorAll(".otp-input");
+    const otp = Array.from(otpInputs).map(input => input.value).join(""); 
+
+    if (otp.length !== 6) {
+        console.error("OTP must be 6 digits");
+        return;
+    }
     const response = await fetch("http://localhost:4000/verify-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, otp })
     });
-    if(response.ok) {
+    if (response.ok) {
         const startAgentResponse = await startAgent(email)
-        if(startAgentResponse.ok) {
+        if (startAgentResponse.ok) {
             console.log("bisa")
             submitStartCredential(email)
         }
@@ -72,7 +97,7 @@ document.getElementById("verifyButton").addEventListener('click', async () => {
     console.log(data.message)
 })
 
-async function startAgent(emailInput){
+async function startAgent(emailInput) {
     const loadingOverlay = document.getElementById("loadingOverlay");
 
     if (!emailInput) {
@@ -115,7 +140,7 @@ async function startAgent(emailInput){
         // Hide full-screen loading overlay
         loadingOverlay.classList.add("d-none");
         document.getElementById("verifyButton").disabled = false;
-        return {ok: true}
+        return { ok: true }
     }
 }
 
@@ -202,7 +227,7 @@ async function fetchSchemaAndCredDefIds() {
 //     });
 // }
 
-async function submitStartCredential (email) {
+async function submitStartCredential(email) {
     let maxRetries = 5; // Maximum retry attempts
     let attempts = 0;
 
@@ -213,7 +238,7 @@ async function submitStartCredential (email) {
             if (data.connection_details && data.connection_details.length > 0) {
                 connectionId = data.connection_details[0].connection_id;
                 window.connectionId = connectionId;
-                break; 
+                break;
             }
         } catch (error) {
             console.error(`Attempt ${attempts + 1}: Error fetching connection data`, error);
@@ -230,10 +255,10 @@ async function submitStartCredential (email) {
     }];
 
     if (!window.connectionId || !window.schemaId || !window.credDefId) {
-        console.error("Missing values:", { 
-            connectionId: window.connectionId, 
-            schemaId: window.schemaId, 
-            credDefId: window.credDefId 
+        console.error("Missing values:", {
+            connectionId: window.connectionId,
+            schemaId: window.schemaId,
+            credDefId: window.credDefId
         });
         alert("Missing connection ID, schema ID, or credential definition ID.");
 
@@ -337,10 +362,10 @@ document.getElementById("detailsForm").addEventListener("submit", async (event) 
     }));
 
     if (!window.connectionId || !window.schemaId || !window.credDefId) {
-        console.error("Missing values:", { 
-            connectionId: window.connectionId, 
-            schemaId: window.schemaId, 
-            credDefId: window.credDefId 
+        console.error("Missing values:", {
+            connectionId: window.connectionId,
+            schemaId: window.schemaId,
+            credDefId: window.credDefId
         });
         alert("Missing connection ID, schema ID, or credential definition ID.");
 
@@ -500,3 +525,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 fetchSchemaAndCredDefIds();
+
+//Some other stuff
+function maskEmail(email) {
+    const parts = email.split("@");
+    if (parts.length !== 2) {
+        return email; // Invalid email format, return original
+    }
+
+    const username = parts[0];
+    const domain = parts[1];
+
+    let maskedUsername = "";
+    if (username.length <= 3) {
+        maskedUsername = username.slice(0, 1) + "***"; // Show first letter, mask the rest
+    } else {
+        maskedUsername = username.slice(0, 2) + "***" + username.slice(-2); // Show first and last two letters, mask middle
+    }
+
+    return maskedUsername + "@" + domain;
+}

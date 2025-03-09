@@ -10,20 +10,38 @@
 <body>
     <div class="bg-dark text-white" style="width: 360px;">
         <div id="setupSection" class="p-4 shadow-lg text-center">
+            <div id="loadingOverlaySetupSection" class="loading-overlay d-none">
+                <div class="spinner-border text-white" role="status"></div>
+                <p class="mt-3 text-white text-center">Sending OTP...</p>
+            </div>  
             <h1 class="text-bold">Credon</h1>
             <p>Enter your email to set up your wallet</p>                              
-            <input type="email" id="emailInput" class="form-control mb-3" placeholder="Enter your email" required>
-            <button id="otpButton" class="btn btn-primary w-100">Send OTP</button>
-        </div>
+            <input type="email" id="emailInput" class="form-control mb-2" placeholder="Enter your email" required>
+            <small class="text-light d-block mb-3 fs-7 opacity-75">(Credon credential starts with your email)</small>
+            <button id="otpButton" class="btn btn-primary w-100">Get OTP</button>
+        </div>        
 
         <div id="otpSection" class="p-4 shadow-lg text-center d-none">
             <div id="loadingOverlay" class="loading-overlay d-none">
                 <div class="spinner-border text-white" role="status"></div>
                 <p class="mt-3 text-white text-center">Starting up your own Credon...</p>
             </div>   
-            <input type="text" id="otp" placeholder="Enter OTP">
-            <button id="verifyButton">Verify OTP</button>
+        
+            <p class="mb-3">Enter the 6-digit OTP sent to your email</p>
+        
+            <div class="d-flex justify-content-center gap-2">
+                <input type="text" class="otp-input form-control text-center" maxlength="1">
+                <input type="text" class="otp-input form-control text-center" maxlength="1">
+                <input type="text" class="otp-input form-control text-center" maxlength="1">
+                <input type="text" class="otp-input form-control text-center" maxlength="1">
+                <input type="text" class="otp-input form-control text-center" maxlength="1">
+                <input type="text" class="otp-input form-control text-center" maxlength="1">
+            </div>
+            <div id="otpSentText" class="text-light d-block mt-2 small opacity-75"></div>
+        
+            <button id="verifyButton" class="mt-3 btn btn-primary w-100">Verify OTP</button>
         </div>
+        
 
         <!-- User Details Section -->
         <div id="inputDetailsSection" class="p-4 shadow-lg text-center d-none">
@@ -42,10 +60,6 @@
             <h1 class="text-bold">Credon</h2>
         </div>
 
-        <!-- <input type="file" id="fileInput" accept="image/*">
-    <button id="uploadButton">Upload Image</button>
-    <div id="result"></div> -->
-
         <div id="proofRequestSection" class="p-4 shadow-lg d-none">
             <h5>Verifier Request</h5>
             <p>The verifier is requesting the following information:</p>
@@ -53,8 +67,6 @@
             <button id="confirmShare" class="btn btn-success w-100 mt-2">Confirm</button>
             <button id="rejectShare" class="btn btn-danger w-100 mt-2">Decline</button>
         </div>
-        <canvas id="canvas" style="display: none;"></canvas>
-        <img id="output" style="max-width:300px; display: none;">
     </div>
 
     <script src="popup.js"></script>

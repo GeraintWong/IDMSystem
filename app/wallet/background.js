@@ -1,6 +1,18 @@
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     console.log("📨 Message received in background:", message);
 
+    if (message.type === "LOGIN_REQUEST") {
+        console.log("🔐 Login request received!");
+
+        // Wake up the extension popup (if it's closed)
+        chrome.action.openPopup();
+
+        // Optionally, send a message to popup.js to show login UI
+        chrome.runtime.sendMessage({ type: "SHOW_LOGIN_POPUP" });
+
+        sendResponse({ success: true, message: "Login request received, prompting user..." });
+    }
+
     if (message.type === "WALLET_NAME") {
         chrome.storage.local.set({ storedWalletName: message.walletName }, () => {
             console.log("✅ Wallet Name stored persistently:", message.walletName);

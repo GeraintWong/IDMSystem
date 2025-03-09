@@ -19,7 +19,7 @@ export interface PresentProof {
   state: string;
   created_at: string;
   updated_at: string;
-  connection_id?: string;
+  connection_id: string;
   verified?: string;
   by_format?: {
     pres_request?: {
@@ -30,6 +30,17 @@ export interface PresentProof {
         requested_predicates: Record<string, unknown>;
       };
     };
+    pres?: {
+      indy?: {
+        requested_proof?: {
+          revealed_attrs?: {
+            email?: {
+              raw: string;
+            }
+          }
+        }
+      }
+    }
   };
 }
 
@@ -247,6 +258,16 @@ export const getWalletCredentialId = async (): Promise<{ referent: string; cred_
     console.error("Error fetching wallet credential ID:", error);
     return [];
   }
+};
+
+let currentConnectionIdOCR = "";
+
+export const setConnectionIdOCR = (connectionIdOCR: string) => {
+  currentConnectionIdOCR = connectionIdOCR;
+};
+
+export const getConnectionIdOCR = () => {
+  return currentConnectionIdOCR;
 };
 
 

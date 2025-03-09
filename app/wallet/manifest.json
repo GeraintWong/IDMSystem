@@ -9,7 +9,7 @@
     "storage"
   ],
   "host_permissions": [
-    "https://*/*", 
+    "https://*/*",
     "http://*/*"
   ],
   "background": {
@@ -20,8 +20,18 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://*/*", "http://*/*"],
-      "js": ["content.js"]
+      "matches": [
+        "https://*/*",
+        "http://*/*"
+      ],
+      "js": [
+        "content.js"
+      ]
     }
-  ]
+  ],
+  "externally_connectable": {
+    "matches": [
+      "<all_urls>"
+    ]
+  }
 }

@@ -6,7 +6,7 @@ import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader,
 import { sendCredential } from "@/app/api/issueCredentials/sendCredential/sendCredential";
 import { getConnections, fetchSchemaAndCredDefIds } from "@/app/api/helper/helper";
 
-const ISSUER2_URL = "http://localhost:11003";
+const ISSUER2_URL = "http://localhost:11004";
 
 const IssuerInternal: React.FC = () => {
     const [schemaName, setSchemaName] = useState("");
@@ -79,7 +79,7 @@ const IssuerInternal: React.FC = () => {
     useEffect(() => {
         async function fetchSavedConfig() {
             try {
-                const response = await fetch("/api/databasesApi/dbProofConfig?label=Issuer2"); // Fetch based on label
+                const response = await fetch("/api/databasesApi/dbProofConfig?label=Issuer3"); // Fetch based on label
                 if (!response.ok) throw new Error("Failed to fetch config");
                 const data = await response.json();
 
@@ -102,7 +102,7 @@ const IssuerInternal: React.FC = () => {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    label: "Issuer2",
+                    label: "Issuer3",
                     credDefId: proofCredDefId,
                     attributes: tempSelectedAttributes
                 }),
@@ -124,7 +124,7 @@ const IssuerInternal: React.FC = () => {
         }
 
         try {
-            const response = await fetch(`http://localhost:11003/credential-definitions/${proofCredDefId}`);
+            const response = await fetch(`http://localhost:11004/credential-definitions/${proofCredDefId}`);
             if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
             const data = await response.json();
 
