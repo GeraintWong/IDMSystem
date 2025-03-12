@@ -6,12 +6,11 @@ export interface Connection {
     their_label: string;
 }
 
-export interface CredentialExchange {
-  credential_exchange_id: string;
-  state: string;
-  credential_proposal: {
-    attributes: { name: string; value: string }[];
-  };
+export interface IssueCredential {
+  cred_ex_record: {
+    cred_ex_id: string;
+    connection_id: string,
+  }
 }
 
 export interface PresentProof {
@@ -63,6 +62,28 @@ const HOLDER_AGENT_URL = "http://localhost:11001";
     }
   };
 
+  export const deleteConnections = async (agentUrl: string, connectionId: string): Promise<boolean> => {
+    try {
+      const response = await fetch(`${agentUrl}/connections/${connectionId}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+  
+      if (!response.ok) {
+        console.error(`❌ Failed to delete connection: ${response.statusText}`);
+        return false;
+      }
+  
+      console.log(`✅ Successfully deleted connection with ID: ${connectionId}`);
+      return true;
+    } catch (error) {
+      console.error("❌ Error deleting connection:", error);
+      return false;
+    }
+  };  
+
   export const getPresentProof = async (agentUrl: string): Promise<PresentProof[]> => {
     try {
       const response = await fetch(`${agentUrl}/present-proof-2.0/records`);
@@ -78,7 +99,7 @@ const HOLDER_AGENT_URL = "http://localhost:11001";
     }
   };
 
-  export const getCredentialExchangeId = async (agentUrl: string): Promise<{ id: string; attributes: { name: string; value: string }[] } | null> => {
+  export const getIssueCredential = async (agentUrl: string): Promise<IssueCredential[]> => {
     try {
       const response = await fetch(`${agentUrl}/issue-credential-2.0/records`);
       if (!response.ok) {
@@ -86,26 +107,10 @@ const HOLDER_AGENT_URL = "http://localhost:11001";
       }
   
       const data = await response.json();
-      const records: CredentialExchange[] = data.results || [];
-  
-      // Find a record that is in a state requiring an offer to be sent
-      const pendingRecord = records.find(record => record.state === "proposal_received");
-  
-      if (!pendingRecord) {
-        console.log("No pending credential exchange found.");
-        return null;
-      }
-  
-      const { credential_exchange_id, credential_proposal } = pendingRecord;
-      const attributes = credential_proposal?.attributes || [];
-  
-      console.log(`Credential Exchange ID: ${credential_exchange_id}`);
-      console.log("Attributes received from holder:", attributes);
-  
-      return { id: credential_exchange_id, attributes };
+      return data.results as IssueCredential[]
     } catch (error) {
       console.error("Error fetching issue-credentials records:", error);
-      return null;
+      return [];
     }
   };
 
@@ -127,6 +132,28 @@ const HOLDER_AGENT_URL = "http://localhost:11001";
       return true;
     } catch (error) {
       console.error("❌ Error deleting proof record:", error);
+      return false;
+    }
+  };  
+
+  export const deleteIssueCredential = async (agentUrl: string, credExId: string): Promise<boolean> => {
+    try {
+      const response = await fetch(`${agentUrl}/issue-credential-2.0/records/${credExId}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+  
+      if (!response.ok) {
+        console.error(`❌ Failed to delete issue credential record: ${response.statusText}`);
+        return false;
+      }
+  
+      console.log(`✅ Successfully deleted issue credential record with ID: ${credExId}`);
+      return true;
+    } catch (error) {
+      console.error("❌ Error deleting issue credential record:", error);
       return false;
     }
   };  
@@ -235,9 +262,9 @@ export const getSchemaAndAttributes = async (agentUrl: string) => {
   }
 };
 
-export const getWalletCredentialId = async (): Promise<{ referent: string; cred_def_id: string }[]> => {
+export const getWalletCredentialId = async (agentUrl: string): Promise<{ referent: string; cred_def_id: string }[]> => {
   try {
-    const walletCredentialResponse = await fetch(`${HOLDER_AGENT_URL}/credentials`);
+    const walletCredentialResponse = await fetch(`${agentUrl}/credentials`);
 
     if (!walletCredentialResponse.ok) {
       throw new Error("Failed to fetch credentials");
@@ -259,6 +286,28 @@ export const getWalletCredentialId = async (): Promise<{ referent: string; cred_
     return [];
   }
 };
+
+export const deleteWalletCredential = async (agentUrl: string, referentId: string): Promise<boolean> => {
+  try {
+    const response = await fetch(`${agentUrl}/credential/${referentId}`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      console.error(`❌ Failed to delete credential: ${response.statusText}`);
+      return false;
+    }
+
+    console.log(`✅ Successfully deleted credential with ID: ${referentId}`);
+    return true;
+  } catch (error) {
+    console.error("❌ Error deleting credential:", error);
+    return false;
+  }
+}
 
 let currentConnectionIdOCR = "";
 

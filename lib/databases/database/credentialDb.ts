@@ -7,14 +7,17 @@ export function initializeDatabase() {
         CREATE TABLE IF NOT EXISTS credentials (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             email TEXT NOT NULL,
-            attributes TEXT NOT NULL
+            attributes TEXT NOT NULL,
+            connectionId TEXT,
+            credExchangeId TEXT,
+            status TEXT
         )
     `);
 }
 
-export function insertCredential(email: string, attributes: Record<string, string>) {
-    const stmt = db.prepare("INSERT INTO credentials (email, attributes) VALUES (?, ?)");
-    stmt.run(email, JSON.stringify(attributes));
+export function insertCredential(email: string, attributes: Record<string, string>,) {
+    const stmt = db.prepare("INSERT INTO credentials (email, attributes, status) VALUES (?, ?, ?)");
+    stmt.run(email, JSON.stringify(attributes), "valid");
 }
 
 export function getCredentials() {
@@ -22,7 +25,55 @@ export function getCredentials() {
         id: record.id,
         email: record.email,
         attributes: JSON.parse(record.attributes),
+        connectionId: record.connectionId,
+        credExchangeId: record.credExchangeId,
+        status: record.status,
+        comment: record.comment,
     }));
+}
+
+export function updateConnectionId(email: string, connectionId: string): boolean {
+    try {
+        console.log(`🛠 Updating connectionId for ${email} to ${connectionId}`);
+        
+        const stmt = db.prepare("UPDATE credentials SET connectionId = ? WHERE email = ?");
+        const result = stmt.run(connectionId, email);
+
+        console.log("🔄 Update result:", result);
+
+        return result.changes > 0;
+    } catch (error) {
+        console.error("Database update error:", error);
+        return false;
+    }
+}
+
+export function updateCredExchangeId(email: string, credExchangeId: string): boolean {
+    try {
+        const stmt = db.prepare("UPDATE credentials SET credExchangeId = ? WHERE email = ?");
+        const result = stmt.run(credExchangeId, email)
+
+        console.log("🔄 Update result:", result);
+
+        return result.changes > 0;
+    } catch (error) {
+        console.error("Database update error:", error);
+        return false;
+    }
+}
+
+export function updateStatus(email: string, status: string): boolean {
+    try {
+        const stmt = db.prepare("UPDATE credentials SET status = ? WHERE email = ?");
+        const result = stmt.run(status, email);
+
+        console.log(`🔄 Status updated to '${status}' for ${email}:`, result);
+
+        return result.changes > 0;
+    } catch (error) {
+        console.error("Database update error:", error);
+        return false;
+    }
 }
 
 initializeDatabase();

@@ -5,12 +5,10 @@ export interface Connection {
     state: string;
 }
 
-const AGENT_2_URL = "http://localhost:11001"; // Holder
-
-export const acceptInvitation = async (invitation: object): Promise<boolean> => {
+export const acceptInvitation = async (agentUrl: string, invitation: object): Promise<boolean> => {
   try {
     // Accept the invitation
-    const response = await fetch(`${AGENT_2_URL}/out-of-band/receive-invitation`, {
+    const response = await fetch(`${agentUrl}/out-of-band/receive-invitation`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(invitation),
@@ -21,23 +19,23 @@ export const acceptInvitation = async (invitation: object): Promise<boolean> => 
     }
 
     // Wait for the connection to be created and fetch connections
-    let connections = await getConnections(AGENT_2_URL);
+    let connections = await getConnections(agentUrl);
     let connection = connections.find((c) => c.state === "response");
 
     if (connection) {
       // Send trust ping immediately
-      await sendTrustPing(connection.connection_id);
+      await sendTrustPing(agentUrl, connection.connection_id);
     }
 
     // Retry logic: Ensure we fetch connections again and send ping if necessary
     let retries = 3; // Maximum number of retries
     while (retries > 0) {
       // Fetch connections again in case state has been updated
-      connections = await getConnections(AGENT_2_URL);
+      connections = await getConnections(agentUrl);
       connection = connections.find((c) => c.state === "response");
 
       if (connection) {
-        await sendTrustPing(connection.connection_id);
+        await sendTrustPing(agentUrl, connection.connection_id);
         return true; // Successfully sent trust ping and connection is active
       }
 
@@ -55,9 +53,9 @@ export const acceptInvitation = async (invitation: object): Promise<boolean> => 
 };
 
 // Function to send a trust ping
-export const sendTrustPing = async (connectionId: string): Promise<void> => {
+export const sendTrustPing = async (agentUrl: string, connectionId: string): Promise<void> => {
   try {
-    await fetch(`${AGENT_2_URL}/connections/${connectionId}/send-ping`, {
+    await fetch(`${agentUrl}/connections/${connectionId}/send-ping`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),

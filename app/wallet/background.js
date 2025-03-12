@@ -5,10 +5,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         console.log("🔐 Login request received!");
 
         // Wake up the extension popup (if it's closed)
+        chrome.storage.local.set({ loginRequest: true });
+        
         chrome.action.openPopup();
-
-        // Optionally, send a message to popup.js to show login UI
-        chrome.runtime.sendMessage({ type: "SHOW_LOGIN_POPUP" });
 
         sendResponse({ success: true, message: "Login request received, prompting user..." });
     }

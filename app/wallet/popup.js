@@ -1,41 +1,57 @@
 document.addEventListener('DOMContentLoaded', async () => {
     try {
-        const walletResponse = await fetch('http://localhost:4000/get-wallet-credentials');
-        const walletData = await walletResponse.json();
+        // ✅ Get stored login request
+        const data = await new Promise((resolve) => {
+            chrome.storage.local.get("loginRequest", resolve);
+        });
 
-        if (walletData.WalletCredentials) {
-            // Display the wallet credential section
-            document.getElementById('walletDetailsSection').classList.remove('d-none');
-            document.getElementById('walletDetailsSection').innerHTML += `<p>Credential ID: ${walletData.WalletCredentials[0].referent}</p>`;
+        if (data.loginRequest) {
+            document.getElementById("signingInSectionId").classList.remove('d-none')
+            document.getElementById("loadingOverlayWalletSection")?.classList.remove("d-none");
+            document.getElementById("setupSection").classList.add("d-none")
+            console.log("✅ Login popup displayed!");
 
-            // Hide other sections since the wallet is already set up
-            document.getElementById('setupSection').style.display = 'none';
-            document.getElementById('inputDetailsSection').style.display = 'none';
-            return; // Exit early since wallet credentials exist
-        }
-
-        const response = await fetch('http://localhost:4000/check-connection');
-        const data = await response.json();
-
-        if (data.connected) {
-            window.connectionId = data.connection_details[0].connection_id;
-
-            // Fetch schemas and credential definitions
-            await fetchSchemaAndCredDefIds();
-
-            // Show input details section if connected
-            document.getElementById('setupSection').classList.add('d-none');
-            document.getElementById('inputDetailsSection').classList.remove('d-none');
+            // ✅ Remove loginRequest from storage
+            chrome.storage.local.remove("loginRequest");
         } else {
-            document.getElementById('setupSection').classList.remove('d-none');
-            document.getElementById('inputDetailsSection').classList.add('d-none');
+            // ✅ Fetch wallet credentials
+            const response = await fetch('http://localhost:4000/get-wallet-credentials');
+            if (!response.ok) throw new Error(`Server error: ${response.status}`);
+
+            const walletData = await response.json();
+
+            // ✅ Ensure `WalletCredentials` exists and is an array
+            if (Array.isArray(walletData.WalletCredentials) && walletData.WalletCredentials.length > 0) {
+                const walletSection = document.getElementById('walletDetailsSection');
+                if (!walletSection) throw new Error("❌ Element 'walletDetailsSection' not found!");
+
+                walletSection.classList.remove('d-none');
+                walletSection.innerHTML = "<h3>Your Credentials</h3>";
+
+                walletData.WalletCredentials.forEach(cred => {
+                    walletSection.innerHTML += `
+                    <p><strong><small>Credential:</small></strong> <small>${cred.cred_def_name}</small><br> 
+                       <strong><small>Credential ID:</small></strong> <small>${cred.referent}</small></p>
+                    <hr>`;
+                });
+
+                // ✅ Hide setup sections
+                document.getElementById('setupSection')?.classList.add('d-none');
+                document.getElementById('inputDetailsSection')?.classList.add('d-none');
+
+                return; // ✅ Exit early since credentials exist
+            }
         }
+
     } catch (error) {
-        console.error("Error checking wallet credentials or connection:", error);
-        document.getElementById('setupSection').classList.remove('d-none');
-        document.getElementById('inputDetailsSection').classList.add('d-none');
+        console.error("❌ Error checking wallet credentials or connection:", error);
+
+        // ✅ Show setup section if wallet credentials are missing or an error occurs
+        document.getElementById('setupSection')?.classList.remove('d-none');
+        document.getElementById('inputDetailsSection')?.classList.add('d-none');
     }
 });
+
 
 //Email type shiii
 document.getElementById("otpButton").addEventListener('click', async () => {
@@ -75,7 +91,7 @@ document.getElementById("otpButton").addEventListener('click', async () => {
 document.getElementById("verifyButton").addEventListener('click', async () => {
     const email = document.getElementById("emailInput").value;
     const otpInputs = document.querySelectorAll(".otp-input");
-    const otp = Array.from(otpInputs).map(input => input.value).join(""); 
+    const otp = Array.from(otpInputs).map(input => input.value).join("");
 
     if (otp.length !== 6) {
         console.error("OTP must be 6 digits");
@@ -89,7 +105,6 @@ document.getElementById("verifyButton").addEventListener('click', async () => {
     if (response.ok) {
         const startAgentResponse = await startAgent(email)
         if (startAgentResponse.ok) {
-            console.log("bisa")
             submitStartCredential(email)
         }
     }
@@ -304,10 +319,20 @@ async function submitStartCredential(email) {
                     const walletResponse = await fetch("http://localhost:4000/get-wallet-credentials");
                     const walletData = await walletResponse.json();
 
-                    if (walletData.WalletId) {
+                    if (walletData.WalletCredentials) {
                         // Stop loading, show wallet details
-                        document.getElementById("walletDetailsSection").classList.remove('d-none');
-                        document.getElementById("walletId").textContent = walletData.WalletId;
+                        const walletSection = document.getElementById('walletDetailsSection');
+                        if (!walletSection) throw new Error("❌ Element 'walletDetailsSection' not found!");
+    
+                        walletSection.classList.remove('d-none');
+                        walletSection.innerHTML = "<h3>Your Credentials</h3>";
+        
+                        walletData.WalletCredentials.forEach(cred => {
+                            walletSection.innerHTML += `
+                            <p><strong><small>Credential:</small></strong> <small>${cred.cred_def_name}</small><br> 
+                               <strong><small>Credential ID:</small></strong> <small>${cred.referent}</small></p>
+                            <hr>`;
+                        });
 
                         // Hide previous sections
                         // document.getElementById("inputDetailsSection").classList.add('d-none');
@@ -474,6 +499,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             console.log("📩 Proof request received in popup!");
 
             // Show popup
+            document.getElementById("signingInSectionId").classList.add('d-none')
+            document.getElementById('loadingOverlayWalletSection').classList.add('d-none');
+            document.getElementById("walletDetailsSection").classList.add('d-none');
             document.getElementById("proofRequestSection").classList.remove('d-none');
 
             // Fetch requested attributes
@@ -483,6 +511,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 body: JSON.stringify({ userConfirmed: false })
             });
 
+            if (!response.ok) {
+                document.getElementById("proofRequestSection").classList.add('d-none');
+                document.getElementById('rejectCredentialSection').innerHTML = `
+                    <div class="alert alert-danger text-center" role="alert">
+                        <strong>Unable to share credentials!</strong><br>
+                        Your credential is either <strong>invalid</strong> or has been <strong>revoked</strong>.
+                        Please check your wallet or request a new valid credential.
+                    </div>`;
+                
+                // Ensure the section is visible
+                document.getElementById('rejectCredentialSection').classList.remove('d-none');
+                
+                console.error("Failed to share credentials. The credential may be invalid or revoked.");
+            }
+
             const data = await response.json();
             console.log("📥 Requested Attributes:", data);
 
@@ -491,9 +534,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 const attributesDiv = document.getElementById("requestedAttributes");
                 attributesDiv.innerHTML = ""; // Clear previous content
 
-                Object.entries(data.requestedAttributes).forEach(([key, value]) => {
+                Object.entries(data.requestedAttributes).forEach(([key]) => {
                     const p = document.createElement("p");
-                    p.innerText = `${key}: ${value.name}`;
+                    const capitalizedKey = key.charAt(0).toUpperCase() + key.slice(1);
+                    p.innerText = `${capitalizedKey}`;
                     attributesDiv.appendChild(p);
                 });
 
@@ -509,7 +553,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     });
 
                     console.log("✅ Presentation sent.");
-                    alert("Presentation sent successfully!");
+                    alert("Credential shared successfully!");
+                    const response = await fetch('http://localhost:4000/get-wallet-credentials');
+                    if (!response.ok) throw new Error(`Server error: ${response.status}`);
+        
+                    const walletData = await response.json();
+                    const walletSection = document.getElementById('walletDetailsSection');
+                    if (!walletSection) throw new Error("❌ Element 'walletDetailsSection' not found!");
+
+                    walletSection.classList.remove('d-none');
+                    walletSection.innerHTML = "<h3>Your Credentials</h3>";
+    
+                    walletData.WalletCredentials.forEach(cred => {
+                        walletSection.innerHTML += `
+                        <p><strong><small>Credential:</small></strong> <small>${cred.cred_def_name}</small><br> 
+                           <strong><small>Credential ID:</small></strong> <small>${cred.referent}</small></p>
+                        <hr>`;
+                    });
                     document.getElementById("proofRequestSection").classList.add('d-none');
                 };
 

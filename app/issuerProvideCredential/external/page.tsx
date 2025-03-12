@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { createInvitation } from "@/app/api/invitation/createInvitation";
 import { Button } from "@/components/ui/button";
-import { fetchSchemaAndCredDefIds, getConnections, getPresentProof, deletePresentProof } from "@/app/api/helper/helper";
+import { fetchSchemaAndCredDefIds, getConnections, getPresentProof, deletePresentProof, getIssueCredential, deleteIssueCredential, deleteConnections } from "@/app/api/helper/helper";
 import { sendProofRequest } from "@/app/api/presentproof/verifierApi/sendProofRequest";
 import { sendCredential } from "@/app/api/issueCredentials/sendCredential/sendCredential";
 import {
@@ -17,7 +17,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ClipboardCopy, Loader2 } from "lucide-react"; // Icons
+import { ClipboardCopy, Loader2, AlertTriangle, Info } from "lucide-react"; // Icons
 
 const ISSUER_URL = "http://localhost:11003"
 
@@ -28,12 +28,16 @@ const IssuerExternal: React.FC = () => {
   const [schemaDetails, setSchemaDetails] = useState<
     { schemaId: string; schemaName: string; credDefId: string }[] | null
   >(null);
-  const [connectionId, setConnectionId] = useState<string | null>(null);
+  const [connectionId, setConnectionId] = useState("");
+  const [extraConnectionId, setExtraConnectionId] = useState("")
   const [presExId, setPresExId] = useState<string | null>(null);
   const [proofState, setProofState] = useState<string | null>(null);
   const [isVerified, setIsVerified] = useState<boolean | null>(null);
   const [selectedAttributes, setSelectedAttributes] = useState<string[]>([]);
   const [proofCredDefId, setProofCredDefId] = useState("");
+  const [holderLabel, setHolderLabel] = useState("")
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isValidOpen, setIsValidOpen] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -84,26 +88,48 @@ const IssuerExternal: React.FC = () => {
         try {
           const connections = await getConnections(ISSUER_URL);
           const connection = connections.find((c) => c.their_label === event.data.data.label);
+          setHolderLabel(event.data.data.label)
 
           if (connection) {
-            const connectionId = connection.connection_id;
-            setConnectionId(connectionId);
-            console.log(`🔗 Found connection ID: ${connectionId}`);
+            const getConnectionId = connection.connection_id;
+
+            const getHolderInformation = await fetch(`/api/databasesApi/dbCredentials?email=${event.data.data.label}`);
+            const userInformation = await getHolderInformation.json();
+
+            if(userInformation[0].connectionId === null && userInformation[0].credExchangeId === null) {
+              console.log("🔍 Sending to API:", { email: event.data.data.label, getConnectionId });
+              await fetch("/api/databasesApi/dbCredentials", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: event.data.data.label, connectionId: getConnectionId }),
+              });
+  
+              setConnectionId(getConnectionId);
+              console.log(`🔗 Found connection ID: ${getConnectionId}`);
+            } else {
+              const getExtraConnections = await getConnections(ISSUER_URL);
+              const extraConnection = getExtraConnections.find((c) => c.connection_id !== userInformation[0].connectionId);
+              const getExtraConnectionId = extraConnection?.connection_id ?? ""
+              setExtraConnectionId(getExtraConnectionId)
+              setConnectionId(userInformation[0].connectionId)
+            }
 
             const getAttributesCredDefIdSpecific = await fetch("/api/databasesApi/dbProofConfig?label=Issuer2"); // Fetch based on label
             if (!getAttributesCredDefIdSpecific.ok) throw new Error("Failed to fetch config");
-            const getAttributesCredDefId= await getAttributesCredDefIdSpecific.json();
+            const getAttributesCredDefId = await getAttributesCredDefIdSpecific.json();
 
             if (getAttributesCredDefId && getAttributesCredDefId.length > 0) {
               const latestConfig = getAttributesCredDefId[getAttributesCredDefId.length - 1]; // Get the latest saved config
-              await sendProofRequest(ISSUER_URL, connectionId, "Proof", latestConfig.attributes, latestConfig.credDefId);
-          }
+              await sendProofRequest(ISSUER_URL, getConnectionId, "Proof", latestConfig.attributes, latestConfig.credDefId);
+            }
             window.postMessage({ type: "ARIES_PROOF_REQUEST" });
-
             const proofRecords = await getPresentProof(ISSUER_URL);
-            const proof = proofRecords.find((p) => p.connection_id === connectionId);
+            const proof = proofRecords.find((p) => p.connection_id === getConnectionId);
 
-            if (proof) {
+            if (proof?.pres_ex_id) {
+              console.log("Before setting presExId:", presExId);
+              setPresExId(proof.pres_ex_id);
+              console.log("After setting presExId:", proof.pres_ex_id);
               setPresExId(proof.pres_ex_id);
               setProofState(proof.state);
               console.log(`✅ Proof Exchange ID stored: ${proof.pres_ex_id}`);
@@ -123,56 +149,101 @@ const IssuerExternal: React.FC = () => {
     return () => window.removeEventListener("message", handleMessage);
   }, []);
 
+  console.log("🔵 Current presExId before useEffect:", presExId);
+
   useEffect(() => {
+    if (!presExId) {
+      console.warn("🚨 presExId is not set, skipping proof check.");
+      return;
+    }
+
     const checkProofStatus = async () => {
-      if (presExId) {
-        try {
-          const proofRecords = await getPresentProof(ISSUER_URL);
-          const proof = proofRecords.find((p) => p.pres_ex_id === presExId);
+      try {
+        const proofRecords = await getPresentProof(ISSUER_URL);
+        const proof = proofRecords.find((p) => p.pres_ex_id === presExId);
 
-          if (proof) {
-            setProofState(proof.state);
+        if (proof) {
+          setProofState(proof.state);
 
-            if (proof.state === "done") {
-              setIsVerified(proof.verified === "true");
-              console.log(`🔍 Proof verification status: ${proof.verified}`);
+          if (proof.state === "done") {
+            setIsVerified(proof.verified === "true");
+            console.log(`🔍 Proof verification status: ${proof.verified}`);
 
-              if (proof.verified === "true") {
-                console.log("✅ Proof verified! Redirecting...");
+            if (proof.verified === "true") {
+              console.log("✅ Proof verified! Redirecting...");
 
-                const userEmail = proof.by_format?.pres?.indy?.requested_proof?.revealed_attrs?.email?.raw;
-                console.log("here is the user's email", userEmail)
+              const userEmail = proof.by_format?.pres?.indy?.requested_proof?.revealed_attrs?.email?.raw;
+              if (!userEmail) {
+                return console.error("No user email")
+              }
+              const label = userEmail.split("@")[0];
 
-                const getHolderInformation = await fetch(`/api/databasesApi/dbCredentials?email=${userEmail}`);
-                const userInformation = await getHolderInformation.json();
-                const fetchSchemaAndCred = await fetchSchemaAndCredDefIds(ISSUER_URL);
-                const fetchedCredDefId = fetchSchemaAndCred.credDefIds[0];
-                const holderConnectionId = proof.connection_id
+              const getHolderInformation = await fetch(`/api/databasesApi/dbCredentials?email=${label}`);
+              const userInformation = await getHolderInformation.json();
+              const fetchSchemaAndCred = await fetchSchemaAndCredDefIds(ISSUER_URL);
+              const fetchedCredDefId = fetchSchemaAndCred.credDefIds[0];
+              const holderConnectionId = proof.connection_id;
 
-                if (!fetchedCredDefId) {
-                  console.error("Credential Definition ID is missing.");
+              if (!fetchedCredDefId) {
+                console.error("Credential Definition ID is missing.");
+                return;
+              }
+
+              if (userInformation[0].connectionId && userInformation[0].credExchangeId) {
+                if (userInformation[0].status === "revoked") {
+                  setIsDialogOpen(true);
+                  await deleteConnections(ISSUER_URL, extraConnectionId)
+                  await deletePresentProof(ISSUER_URL, presExId);
+                  return;
+                } else if (userInformation[0].status === "valid") {
+                  setIsValidOpen(true)
+                  await deleteConnections(ISSUER_URL, extraConnectionId)
+                  await deletePresentProof(ISSUER_URL, presExId)
                   return;
                 }
-
-                await sendCredential(ISSUER_URL, holderConnectionId, userInformation[0].attributes, "", false, fetchSchemaAndCred.schemaDetails[0].schemaId, fetchedCredDefId, false);
-
-                // Delete proof record after successful verification
+                await deleteConnections(ISSUER_URL, extraConnectionId)
                 await deletePresentProof(ISSUER_URL, presExId);
+                await sendCredential(ISSUER_URL, userInformation[0].connectionId, userInformation[0].attributes, "", false, fetchSchemaAndCred.schemaDetails[0].schemaId, fetchedCredDefId, false);
+                return;
+              }
+
+              await deletePresentProof(ISSUER_URL, presExId);
+              await sendCredential(ISSUER_URL, holderConnectionId, userInformation[0].attributes, "", false, fetchSchemaAndCred.schemaDetails[0].schemaId, fetchedCredDefId, false);
+              await new Promise((resolve) => setTimeout(resolve, 2000));
+
+              const issueCredentialsRecord = await getIssueCredential(ISSUER_URL);
+              const matchingRecord = issueCredentialsRecord.find(
+                (c) => c.cred_ex_record.connection_id === connectionId
+              );
+
+              if (matchingRecord) {
+                const credExchangeId = matchingRecord.cred_ex_record.cred_ex_id;
+                await fetch("/api/databasesApi/dbCredentials", {
+                  method: "PUT",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ email: holderLabel, credExchangeId: credExchangeId }),
+                });
+                console.log("✅ Credential Exchange ID:", credExchangeId);
+                deleteIssueCredential(ISSUER_URL, credExchangeId)
+              } else {
+                console.log("❌ No credential exchange record found for the given connection_id.");
               }
             }
           }
-        } catch (error) {
-          console.error("❌ Error checking proof status:", error);
         }
+      } catch (error) {
+        console.error("❌ Error checking proof status:", error);
       }
     };
 
-    const interval = presExId && proofState !== "done" ? setInterval(checkProofStatus, 3000) : null;
+    console.log(`⏳ Monitoring proof status for presExId: ${presExId}`);
+    checkProofStatus(); // Run it once immediately
 
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [presExId, proofState]);
+    const interval = setInterval(checkProofStatus, 3000);
+
+    return () => clearInterval(interval);
+  }, [presExId]);
+
 
   return (
     <div className="flex min-h-screen bg-gray-900 text-white p-6">
@@ -193,6 +264,52 @@ const IssuerExternal: React.FC = () => {
           )}
         </ul>
       </div>
+      <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <AlertDialogContent className="max-w-md p-6">
+          <AlertDialogHeader className="flex items-center gap-2">
+            <AlertTriangle className="text-red-500" size={24} /> {/* Warning Icon */}
+            <AlertDialogTitle>Credential Revoked</AlertDialogTitle>
+          </AlertDialogHeader>
+          <AlertDialogDescription className="text-gray-600">
+            Your credential has been revoked due to security or policy reasons.
+            If you believe this is a mistake, please contact our support team for assistance.
+          </AlertDialogDescription>
+          <div className="mt-4 text-sm text-gray-500">
+            <strong>Email:</strong> <a href="mailto:support@example.com" className="text-blue-600 hover:underline">support@example.com</a>
+          </div>
+          <div className="mt-4 text-sm text-gray-500">
+            <strong>Phone:</strong> <a href="tel:+1234567890" className="text-blue-600 hover:underline">+1 234 567 890</a>
+          </div>
+          <AlertDialogFooter className="mt-4">
+            <AlertDialogAction onClick={() => setIsDialogOpen(false)}>OK, Got It</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={isValidOpen} onOpenChange={setIsValidOpen}>
+        <AlertDialogContent className="max-w-md p-6">
+          <AlertDialogHeader className="flex items-center gap-2">
+            <Info className="text-blue-500" size={24} /> {/* Info Icon */}
+            <AlertDialogTitle>Active Credential Exists</AlertDialogTitle>
+          </AlertDialogHeader>
+          <AlertDialogDescription className="text-gray-600">
+            You already have an active valid credential.
+            Since only one credential can be issued at a time, you cannot request a new one.
+            If you believe this is an error or need further assistance, please contact our support team.
+          </AlertDialogDescription>
+          <div className="mt-4 text-sm text-gray-500">
+            <strong>Email:</strong> <a href="mailto:support@example.com" className="text-blue-600 hover:underline">support@example.com</a>
+          </div>
+          <div className="mt-4 text-sm text-gray-500">
+            <strong>Phone:</strong> <a href="tel:+1234567890" className="text-blue-600 hover:underline">+1 234 567 890</a>
+          </div>
+          <AlertDialogFooter className="mt-4">
+            <AlertDialogAction onClick={() => setIsValidOpen(false)}>OK, Got It</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+
       <Button onClick={handleLoginWithWallet} disabled={loading} className="px-6 py-3 text-lg">
         {loading ? (
           <span className="flex items-center gap-2">

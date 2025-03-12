@@ -1,7 +1,7 @@
 import express from 'express'; // ES module import
 import cors from 'cors'; // ES module import
 import { exec } from 'child_process'; // ES module import
-import { getConnections, fetchSchemaAndCredDefIds, getWalletCredentialId, getPresentProof } from '../api/helper/helper.ts';
+import { getConnections, fetchSchemaAndCredDefIds, getWalletCredentialId, getPresentProof, deleteWalletCredential } from '../api/helper/helper.ts';
 import { createInvitation } from '../api/invitation/createInvitation.ts'; // Import with .ts extension
 import { acceptInvitation } from '../api/invitation/acceptInvitation.ts'; // Import with .ts extension
 import { sendCredentialProposal } from '../api/issueCredentials/sendProposal/sendProposal.ts';
@@ -16,8 +16,11 @@ const ISSUER_URL = "http://localhost:11000";
 const HOLDER_URL = "http://localhost:11001"; 
 
 const app = express();
+const app2 = express();
 app.use(express.json());
 app.use(cors());
+app2.use(express.json())
+app2.use(cors())
 
 app.post('/start-agent', async (req, res) => {
     const { walletName } = req.body;
@@ -47,7 +50,7 @@ app.post('/start-agent', async (req, res) => {
         --auto-respond-credential-offer \
         --auto-respond-credential-request \
         --auto-store-credential \
-        --preserve-exchange-records
+        --preserve-exchange-records \
     `;
 
     exec(dockerCommand, async (error, stdout, stderr) => {
@@ -69,7 +72,7 @@ app.post('/start-agent', async (req, res) => {
                 const invitationData = JSON.parse(atob(decodedUrl));
 
                 // Accept the invitation with the agent
-                const connectionSuccessful = await acceptInvitation(invitationData);
+                const connectionSuccessful = await acceptInvitation(HOLDER_URL, invitationData);
                 if (connectionSuccessful) {
                     console.log('Connection successfully established with the issuer.');
                     return res.json({ message: 'Agent started and connected to issuer' });
@@ -87,7 +90,7 @@ app.post('/start-agent', async (req, res) => {
 app.get('/check-connection', async (req, res) => {
     try {
         // Fetch current connections from the Aries agent API using getConnections
-        const connections = await getConnections("http://localhost:11001");
+        const connections = await getConnections(HOLDER_URL);
 
         // Filter active connections
         const activeConnections = connections.filter((connection) => connection.state === 'active');
@@ -152,18 +155,33 @@ app.get("/get-proposals", (req, res) => {
 
 app.get('/get-wallet-credentials', async (req, res) => {
     try {
-        const credentials = await getWalletCredentialId(); // Await the async function
+        const credentials = await getWalletCredentialId(HOLDER_URL); // Await the async function
 
         if (!credentials || credentials.length === 0) {
             return res.status(404).json({ message: "No wallet credentials found" });
         }
 
-        return res.json({ WalletCredentials: credentials }); // Return both referent & cred_def_id
+        function extractCredName(credDefId) {
+            if (!credDefId) return "Unknown";
+            let parts = credDefId.split(":");
+            return parts.length > 4 ? parts[4].replace(/_/g, " ") : "Unknown";
+        }
+
+        // Map credentials to include extracted names
+        const formattedCredentials = credentials.map(cred => ({
+            referent: cred.referent,
+            cred_def_id: cred.cred_def_id,
+            cred_def_name: extractCredName(cred.cred_def_id),
+        }));
+
+        return res.json({ WalletCredentials: formattedCredentials });
+
     } catch (error) {
         console.error('Error fetching wallet credential ID:', error);
         res.status(500).json({ message: 'Failed to fetch wallet credential IDs' });
     }
 });
+
 
 app.post('/accept-invitation', async (req, res) => {
     const { invitationUrl } = req.body;
@@ -173,7 +191,7 @@ app.post('/accept-invitation', async (req, res) => {
     const decodedUrl = decodeURIComponent(invitationUrl.split("oob=")[1]);
     const invitationData = JSON.parse(atob(decodedUrl));
 
-    const success = await acceptInvitation(invitationData);
+    const success = await acceptInvitation(HOLDER_URL, invitationData);
     if (success) {
        return res.json({message: 'Invitation Accepted'})
     } else {
@@ -310,6 +328,48 @@ const transporter = nodemailer.createTransport({
       res.status(400).json({ error: "Invalid OTP" });
     }
   });
+
+  app.post("/webhook", async (req, res) => {
+    try {
+        const { cred_def_id, status, reason } = req.body;
+
+        if (status === "revoked") {
+            console.log(`🔴 Credential revoked: ${cred_def_id}, Reason: ${reason}`);
+
+            // Fetch wallet credentials
+            const walletResponse = await fetch("http://localhost:4000/get-wallet-credentials");
+            
+            if (!walletResponse.ok) {
+                throw new Error(`Failed to fetch wallet credentials: ${walletResponse.statusText}`);
+            }
+
+            const walletData = await walletResponse.json();
+            console.log("🔍 Wallet Data:", walletData);
+
+            // Find the matching credential in the wallet
+            const matchingCredential = walletData.WalletCredentials.find(cred => cred.cred_def_id === cred_def_id);
+
+            if (matchingCredential) {
+                console.log("✅ Matching Credential Found:", matchingCredential);
+                const referentId = matchingCredential.referent
+                const deleteResponse = await deleteWalletCredential(HOLDER_URL, referentId);
+
+                if (!deleteResponse) {
+                    throw new Error("Failed to delete credential");
+                }
+
+                console.log("🗑️ Credential successfully deleted!");
+            } else {
+                console.log("⚠️ No matching credential found in wallet.");
+            }
+        }
+
+        res.status(200).json({ message: "✅ Webhook processed successfully!" });
+    } catch (error) {
+        console.error("❌ Error processing webhook:", error);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+});
 
 
 app.listen(4000, () => console.log('Server running on port 4000'));
