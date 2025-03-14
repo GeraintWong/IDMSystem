@@ -11,6 +11,7 @@
 
 <body>
     <div class="bg-dark text-white" style="width: 360px;">
+        <!-- Momentarily adding d-none -->
         <div id="setupSection" class="p-4 shadow-lg text-center">
             <div id="loadingOverlaySetupSection" class="loading-overlay d-none">
                 <div class="spinner-border text-white" role="status"></div>
@@ -46,15 +47,10 @@
 
 
         <!-- User Details Section -->
-        <div id="inputDetailsSection" class="p-4 shadow-lg text-center d-none">
-            <h1 class="text-bold">Enter Your Details</h1>
-            <form id="detailsForm">
-                <div id="dynamicInputs"></div>
-                <div id="loadingOverlay" class="d-none">
-                    <div class="spinner-border text-primary" role="status"></div>
-                    <p>Processing your request...</p>
-                </div>
-                <button type="submit" id="submitButton" class="btn btn-primary w-100 mt-3">Submit</button>
+        <div id="inputPasswordSection" class="p-4 shadow-lg text-center d-none">
+            <h1 id="enterPasswordText" class="text-bold"></h1>
+            <input type="password" id="passwordInput" class="form-control mt-3" placeholder="Enter a password" required>
+                <button type="submit" id="submitPasswordButton" class="btn btn-primary w-100 mt-3">Submit</button>
             </form>
         </div>
 
@@ -82,7 +78,7 @@
         </div>
     </div>
 
-    <script src="popup.js"></script>
+    <script type="module" src="popup.js"></script>
 </body>
 
 </html>

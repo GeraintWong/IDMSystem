@@ -1,56 +1,78 @@
 document.addEventListener('DOMContentLoaded', async () => {
     try {
-        // ✅ Get stored login request
-        const data = await new Promise((resolve) => {
-            chrome.storage.local.get("loginRequest", resolve);
-        });
+        const isLoggedIn = await checkLoginStatus();
+        const storedData = await getStoredPasswordData();
 
-        if (data.loginRequest) {
-            document.getElementById("signingInSectionId").classList.remove('d-none')
-            document.getElementById("loadingOverlayWalletSection")?.classList.remove("d-none");
-            document.getElementById("setupSection").classList.add("d-none")
-            console.log("✅ Login popup displayed!");
-
-            // ✅ Remove loginRequest from storage
-            chrome.storage.local.remove("loginRequest");
+        if (!isLoggedIn && storedData.passwordHash && storedData.passwordSalt) {
+            document.getElementById('setupSection')?.classList.add('d-none');
+            document.getElementById("inputPasswordSection").classList.remove('d-none')
+            document.getElementById("enterPasswordText").innerHTML = "Enter Password"
         } else {
-            // ✅ Fetch wallet credentials
-            const response = await fetch('http://localhost:4000/get-wallet-credentials');
-            if (!response.ok) throw new Error(`Server error: ${response.status}`);
+            const data = await new Promise((resolve) => {
+                chrome.storage.local.get("loginRequest", resolve);
+            });
 
-            const walletData = await response.json();
+            if (data.loginRequest) {
+                document.getElementById("signingInSectionId").classList.remove('d-none')
+                document.getElementById("loadingOverlayWalletSection")?.classList.remove("d-none");
+                document.getElementById("setupSection").classList.add("d-none")
+                console.log("✅ Login popup displayed!");
 
-            // ✅ Ensure `WalletCredentials` exists and is an array
-            if (Array.isArray(walletData.WalletCredentials) && walletData.WalletCredentials.length > 0) {
-                const walletSection = document.getElementById('walletDetailsSection');
-                if (!walletSection) throw new Error("❌ Element 'walletDetailsSection' not found!");
+                // ✅ Remove loginRequest from storage
+                chrome.storage.local.remove("loginRequest");
+            } else {
+                // ✅ Fetch wallet credentials
+                const response = await fetch('http://localhost:4000/get-wallet-credentials');
+                if (!response.ok) throw new Error(`Server error: ${response.status}`);
 
-                walletSection.classList.remove('d-none');
-                walletSection.innerHTML = "<h3>Your Credentials</h3>";
+                const walletData = await response.json();
 
-                walletData.WalletCredentials.forEach(cred => {
-                    walletSection.innerHTML += `
-                    <p><strong><small>Credential:</small></strong> <small>${cred.cred_def_name}</small><br> 
-                       <strong><small>Credential ID:</small></strong> <small>${cred.referent}</small></p>
-                    <hr>`;
-                });
+                // ✅ Ensure `WalletCredentials` exists and is an array
+                if (Array.isArray(walletData.WalletCredentials) && walletData.WalletCredentials.length > 0) {
+                    const walletSection = document.getElementById('walletDetailsSection');
+                    if (!walletSection) throw new Error("❌ Element 'walletDetailsSection' not found!");
 
-                // ✅ Hide setup sections
-                document.getElementById('setupSection')?.classList.add('d-none');
-                document.getElementById('inputDetailsSection')?.classList.add('d-none');
+                    walletSection.classList.remove('d-none');
+                    walletSection.innerHTML = "<h3>Your Credentials</h3>";
 
-                return; // ✅ Exit early since credentials exist
+                    walletData.WalletCredentials.forEach(cred => {
+                        walletSection.innerHTML += `
+                        <p><strong><small>Credential:</small></strong> <small>${cred.cred_def_name}</small><br> 
+                           <strong><small>Credential ID:</small></strong> <small>${cred.referent}</small></p>
+                        <hr>`;
+                    });
+
+                    // ✅ Hide setup sections
+                    document.getElementById('setupSection')?.classList.add('d-none');
+                    document.getElementById('inputDetailsSection')?.classList.add('d-none');
+
+                    return; // ✅ Exit early since credentials exist
+                }
+
             }
         }
 
     } catch (error) {
         console.error("❌ Error checking wallet credentials or connection:", error);
-
-        // ✅ Show setup section if wallet credentials are missing or an error occurs
         document.getElementById('setupSection')?.classList.remove('d-none');
-        document.getElementById('inputDetailsSection')?.classList.add('d-none');
     }
 });
+
+async function acceptAriesInvitation(invitationUrl) {
+    try {
+        const response = await fetch("http://localhost:4000/accept-invitation", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ invitationUrl }),
+        });
+
+        const data = await response.json();
+        return response.ok ? data.success : false;
+    } catch (error) {
+        console.error("Error during Aries invitation acceptance:", error);
+        return false;
+    }
+}
 
 
 //Email type shiii
@@ -159,55 +181,6 @@ async function startAgent(emailInput) {
     }
 }
 
-// document.getElementById("setupButton").addEventListener("click", async () => {
-//     const emailInput = document.getElementById("emailInput").value.trim();
-//     const setupButton = document.getElementById("setupButton");
-//     const loadingOverlay = document.getElementById("loadingOverlay");
-
-//     if (!emailInput) {
-//         alert("Please enter an email address.");
-//         return;
-//     }
-
-//     const walletName = emailInput.split("@")[0];
-
-//     // Show full-screen loading overlay
-//     loadingOverlay.classList.remove("d-none");
-//     setupButton.disabled = true;
-
-//     try {
-//         const response = await fetch("http://localhost:4000/start-agent", {
-//             method: "POST",
-//             headers: { "Content-Type": "application/json" },
-//             body: JSON.stringify({ walletName }),
-//         });
-
-//         const data = await response.json();
-
-//         if (response.ok) {
-//             chrome.runtime.sendMessage({
-//                 type: "WALLET_NAME",
-//                 walletName: walletName
-//             });
-
-//             console.log("📤 Wallet Name sent to background:", walletName);
-
-//             // Switch UI sections
-//             document.getElementById('setupSection').classList.add('d-none');
-//             document.getElementById('inputDetailsSection').classList.remove('d-none');
-//         } else {
-//             alert("Failed to start Aries agent: " + data.message);
-//         }
-//     } catch (error) {
-//         console.error("Error starting agent:", error);
-//         alert("Failed to start Aries agent.");
-//     } finally {
-//         // Hide full-screen loading overlay
-//         loadingOverlay.classList.add("d-none");
-//         setupButton.disabled = false;
-//     }
-// });
-
 async function fetchSchemaAndCredDefIds() {
     try {
         const response = await fetch("http://localhost:4000/get-schema-and-cred-def-ids");
@@ -226,22 +199,6 @@ async function fetchSchemaAndCredDefIds() {
     }
 }
 
-// function generateDynamicForm(attributes) {
-//     const formContainer = document.getElementById("dynamicInputs");
-//     formContainer.innerHTML = "";
-
-//     attributes.forEach(attr => {
-//         const input = document.createElement("input");
-//         input.type = "text";
-//         input.id = attr;
-//         input.name = attr;
-//         input.placeholder = `Enter ${attr}`;
-//         input.required = true;
-//         input.classList.add('form-control', 'mt-3')
-//         formContainer.appendChild(input);
-//     });
-// }
-
 async function submitStartCredential(email) {
     let maxRetries = 5; // Maximum retry attempts
     let attempts = 0;
@@ -251,7 +208,7 @@ async function submitStartCredential(email) {
             const response = await fetch('http://localhost:4000/check-connection');
             const data = await response.json();
             if (data.connection_details && data.connection_details.length > 0) {
-                connectionId = data.connection_details[0].connection_id;
+                let connectionId = data.connection_details[0].connection_id;
                 window.connectionId = connectionId;
                 break;
             }
@@ -304,50 +261,8 @@ async function submitStartCredential(email) {
         const result = await response.json();
         if (response.ok) {
             console.log("Credential proposal sent:", result);
-
-            async function checkWalletCredentials(attempt = 0) {
-                if (attempt >= 10) {
-                    console.warn("Timeout: Wallet credentials not received.");
-                    alert("Timeout: Wallet credentials not received.");
-                    loadingOverlay.classList.add("d-none");
-                    // submitButton.classList.remove("d-none");
-                    // dynamicInputs.classList.remove("d-none");
-                    return;
-                }
-
-                try {
-                    const walletResponse = await fetch("http://localhost:4000/get-wallet-credentials");
-                    const walletData = await walletResponse.json();
-
-                    if (walletData.WalletCredentials) {
-                        // Stop loading, show wallet details
-                        const walletSection = document.getElementById('walletDetailsSection');
-                        if (!walletSection) throw new Error("❌ Element 'walletDetailsSection' not found!");
-    
-                        walletSection.classList.remove('d-none');
-                        walletSection.innerHTML = "<h3>Your Credentials</h3>";
-        
-                        walletData.WalletCredentials.forEach(cred => {
-                            walletSection.innerHTML += `
-                            <p><strong><small>Credential:</small></strong> <small>${cred.cred_def_name}</small><br> 
-                               <strong><small>Credential ID:</small></strong> <small>${cred.referent}</small></p>
-                            <hr>`;
-                        });
-
-                        // Hide previous sections
-                        // document.getElementById("inputDetailsSection").classList.add('d-none');
-
-                        return;
-                    }
-                } catch (error) {
-                    console.error("Error fetching Wallet ID:", error);
-                }
-
-                setTimeout(() => checkWalletCredentials(attempt + 1), 1000);
-            }
-
-            // Start polling for wallet credentials
-            checkWalletCredentials();
+            document.getElementById("inputPasswordSection").classList.remove('d-none')
+            document.getElementById("enterPasswordText").innerHTML = "Setup Password"
         } else {
             console.error("Server error:", result);
             alert("Error: " + result.message);
@@ -365,131 +280,6 @@ async function submitStartCredential(email) {
         loadingOverlay.classList.add("d-none");
         // submitButton.classList.remove("d-none");
         // dynamicInputs.classList.remove("d-none");
-    }
-}
-
-document.getElementById("detailsForm").addEventListener("submit", async (event) => {
-    event.preventDefault();
-
-    const loadingOverlay = document.getElementById("loadingOverlay");
-    const dynamicInputs = document.getElementById("dynamicInputs");
-
-    // Show loading, hide inputs and button
-    loadingOverlay.classList.remove("d-none");
-    dynamicInputs.classList.add("d-none");
-
-    // Collect input fields
-    const inputs = document.querySelectorAll("#dynamicInputs input");
-    const credAttrs = Array.from(inputs).map(input => ({
-        name: input.name,
-        mime_type: "text/plain",
-        value: input.value.trim(),
-    }));
-
-    if (!window.connectionId || !window.schemaId || !window.credDefId) {
-        console.error("Missing values:", {
-            connectionId: window.connectionId,
-            schemaId: window.schemaId,
-            credDefId: window.credDefId
-        });
-        alert("Missing connection ID, schema ID, or credential definition ID.");
-
-        // Hide loading if there's an error
-        loadingOverlay.classList.add("d-none");
-        submitButton.classList.remove("d-none");
-        dynamicInputs.classList.remove("d-none");
-
-        return;
-    }
-
-    const payload = {
-        connectionId: window.connectionId,
-        credAttrs,
-        comment: `Issuing ${window.schemaName} credential`,
-        autoRemove: true,
-        schemaId: window.schemaId,
-        credDefId: window.credDefId
-    };
-
-    try {
-        const response = await fetch("http://localhost:4000/send-credential-proposal", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-        });
-
-        const result = await response.json();
-        if (response.ok) {
-            console.log("Credential proposal sent:", result);
-
-            async function checkWalletCredentials(attempt = 0) {
-                if (attempt >= 10) {
-                    console.warn("Timeout: Wallet credentials not received.");
-                    alert("Timeout: Wallet credentials not received.");
-                    loadingOverlay.classList.add("d-none");
-                    submitButton.classList.remove("d-none");
-                    dynamicInputs.classList.remove("d-none");
-                    return;
-                }
-
-                try {
-                    const walletResponse = await fetch("http://localhost:4000/get-wallet-credentials");
-                    const walletData = await walletResponse.json();
-
-                    if (walletData.WalletId) {
-                        // Stop loading, show wallet details
-                        document.getElementById("walletDetailsSection").classList.remove('d-none');
-                        document.getElementById("walletId").textContent = walletData.WalletId;
-
-                        // Hide previous sections
-                        document.getElementById("inputDetailsSection").classList.add('d-none');
-
-                        return;
-                    }
-                } catch (error) {
-                    console.error("Error fetching Wallet ID:", error);
-                }
-
-                setTimeout(() => checkWalletCredentials(attempt + 1), 1000);
-            }
-
-            // Start polling for wallet credentials
-            checkWalletCredentials();
-        } else {
-            console.error("Server error:", result);
-            alert("Error: " + result.message);
-
-            // Hide loading if there's an error
-            loadingOverlay.classList.add("d-none");
-            submitButton.classList.remove("d-none");
-            dynamicInputs.classList.remove("d-none");
-        }
-    } catch (error) {
-        console.error("Error sending credential proposal:", error);
-        alert("Failed to send credential proposal.");
-
-        // Hide loading if there's an error
-        loadingOverlay.classList.add("d-none");
-        submitButton.classList.remove("d-none");
-        dynamicInputs.classList.remove("d-none");
-    }
-});
-
-
-// Function to accept Aries invitation
-async function acceptAriesInvitation(invitationUrl) {
-    try {
-        const response = await fetch("http://localhost:4000/accept-invitation", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ invitationUrl }),
-        });
-
-        const data = await response.json();
-        return response.ok ? data.success : false;
-    } catch (error) {
-        console.error("Error during Aries invitation acceptance:", error);
-        return false;
     }
 }
 
@@ -519,10 +309,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                         Your credential is either <strong>invalid</strong> or has been <strong>revoked</strong>.
                         Please check your wallet or request a new valid credential.
                     </div>`;
-                
+
                 // Ensure the section is visible
                 document.getElementById('rejectCredentialSection').classList.remove('d-none');
-                
+
                 console.error("Failed to share credentials. The credential may be invalid or revoked.");
             }
 
@@ -556,14 +346,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     alert("Credential shared successfully!");
                     const response = await fetch('http://localhost:4000/get-wallet-credentials');
                     if (!response.ok) throw new Error(`Server error: ${response.status}`);
-        
+
                     const walletData = await response.json();
                     const walletSection = document.getElementById('walletDetailsSection');
                     if (!walletSection) throw new Error("❌ Element 'walletDetailsSection' not found!");
 
                     walletSection.classList.remove('d-none');
                     walletSection.innerHTML = "<h3>Your Credentials</h3>";
-    
+
                     walletData.WalletCredentials.forEach(cred => {
                         walletSection.innerHTML += `
                         <p><strong><small>Credential:</small></strong> <small>${cred.cred_def_name}</small><br> 
@@ -605,3 +395,164 @@ function maskEmail(email) {
 
     return maskedUsername + "@" + domain;
 }
+
+//Password stuff
+document.getElementById("submitPasswordButton").addEventListener("click", async () => {
+    const password = document.getElementById("passwordInput").value;
+
+    // Check if a password has been set
+    const storedData = await getStoredPasswordData();
+
+    if (!storedData.passwordHash || !storedData.passwordSalt) {
+        await savePassword(password);
+        await loginSuccess();
+        document.getElementById("inputPasswordSection").classList.add('d-none')
+        const response = await fetch('http://localhost:4000/get-wallet-credentials');
+        if (!response.ok) throw new Error(`Server error: ${response.status}`);
+
+        const walletData = await response.json();
+
+        // ✅ Ensure `WalletCredentials` exists and is an array
+        if (Array.isArray(walletData.WalletCredentials) && walletData.WalletCredentials.length > 0) {
+            const walletSection = document.getElementById('walletDetailsSection');
+            if (!walletSection) throw new Error("❌ Element 'walletDetailsSection' not found!");
+
+            walletSection.classList.remove('d-none');
+            walletSection.innerHTML = "<h3>Your Credentials</h3>";
+
+            walletData.WalletCredentials.forEach(cred => {
+                walletSection.innerHTML += `
+                        <p><strong><small>Credential:</small></strong> <small>${cred.cred_def_name}</small><br> 
+                           <strong><small>Credential ID:</small></strong> <small>${cred.referent}</small></p>
+                        <hr>`;
+            });
+        }
+    } else {
+        const isValid = await verifyPassword(password);
+        if (isValid) {
+            await loginSuccess();
+            document.getElementById("inputPasswordSection").classList.add('d-none')
+            const response = await fetch('http://localhost:4000/get-wallet-credentials');
+            if (!response.ok) throw new Error(`Server error: ${response.status}`);
+
+            const walletData = await response.json();
+
+            // ✅ Ensure `WalletCredentials` exists and is an array
+            if (Array.isArray(walletData.WalletCredentials) && walletData.WalletCredentials.length > 0) {
+                const walletSection = document.getElementById('walletDetailsSection');
+                if (!walletSection) throw new Error("❌ Element 'walletDetailsSection' not found!");
+
+                walletSection.classList.remove('d-none');
+                walletSection.innerHTML = "<h3>Your Credentials</h3>";
+
+                walletData.WalletCredentials.forEach(cred => {
+                    walletSection.innerHTML += `
+                        <p><strong><small>Credential:</small></strong> <small>${cred.cred_def_name}</small><br> 
+                           <strong><small>Credential ID:</small></strong> <small>${cred.referent}</small></p>
+                        <hr>`;
+                });
+            }
+        } else {
+            alert("Login Failed! Incorrect password.");
+        }
+    }
+});
+
+async function hashPassword(password, salt = null) {
+    // Generate a random 16-byte salt if none is provided
+    if (!salt) {
+        const saltArray = new Uint8Array(16);
+        crypto.getRandomValues(saltArray);
+        salt = Array.from(saltArray).map(byte => byte.toString(16).padStart(2, "0")).join("");
+    }
+
+    // Encode password
+    const encoder = new TextEncoder();
+    const passwordBuffer = encoder.encode(password);
+
+    // Import the password as a key
+    const key = await crypto.subtle.importKey(
+        "raw",
+        passwordBuffer,
+        { name: "PBKDF2" },
+        false,
+        ["deriveBits"]
+    );
+
+    // Derive a 256-bit key using PBKDF2 with SHA-256
+    const derivedBits = await crypto.subtle.deriveBits(
+        {
+            name: "PBKDF2",
+            salt: new TextEncoder().encode(salt), // Use stored salt
+            iterations: 100000, // Increase to make brute-force harder
+            hash: "SHA-256"
+        },
+        key,
+        256
+    );
+
+    // Convert derivedBits to hex string
+    const hashArray = Array.from(new Uint8Array(derivedBits));
+    const hash = hashArray.map(byte => byte.toString(16).padStart(2, "0")).join("");
+
+    return { hash, salt }; // Return both hash and salt
+}
+
+
+async function savePassword(password) {
+    const { hash, salt } = await hashPassword(password);
+
+    chrome.storage.local.set({ passwordHash: hash, passwordSalt: salt }, () => {
+        console.log("Password saved securely with PBKDF2!");
+    });
+}
+
+async function verifyPassword(inputPassword) {
+    return new Promise((resolve) => {
+        chrome.storage.local.get(["passwordHash", "passwordSalt"], async (data) => {
+            if (!data.passwordHash || !data.passwordSalt) {
+                console.log("No password set.");
+                resolve(false); // No password stored, cannot verify
+                return;
+            }
+
+            // Recompute the hash using the stored salt
+            const { hash: inputHash } = await hashPassword(inputPassword, data.passwordSalt);
+
+            if (inputHash === data.passwordHash) {
+                console.log("✅ Access Granted!");
+                resolve(true);  // Password correct
+            } else {
+                console.log("❌ Incorrect Password!");
+                resolve(false); // Password incorrect
+            }
+        });
+    });
+}
+
+
+async function loginSuccess() {
+    await chrome.storage.session.set({ session_wallet: true });
+    console.log("User logged in, session stored.");
+}
+
+async function checkLoginStatus() {
+    const session = await chrome.storage.session.get("session_wallet");
+    return !!session.session_wallet; // Returns true if session exists, false otherwise
+}
+
+// Helper function to retrieve stored password hash and salt
+async function getStoredPasswordData() {
+    return new Promise((resolve) => {
+        chrome.storage.local.get(["passwordHash", "passwordSalt"], (result) => {
+            resolve({
+                passwordHash: result.passwordHash || null,
+                passwordSalt: result.passwordSalt || null
+            });
+        });
+    });
+}
+
+
+
+

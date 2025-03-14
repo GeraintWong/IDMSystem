@@ -1,3 +1,15 @@
+chrome.runtime.onSuspend.addListener(() => {
+    console.log("Chrome is closing. Logging out...");
+    logout();
+});
+
+function logout() {
+    chrome.storage.session.clear(() => {
+        console.log("Logged out: Session data cleared.");
+    });
+}
+
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     console.log("📨 Message received in background:", message);
 

@@ -17,7 +17,10 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ClipboardCopy, Loader2, AlertTriangle, Info } from "lucide-react"; // Icons
+import { CheckCircle } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ClipboardCopy, Loader2, AlertTriangle, Info, PencilIcon, UploadIcon } from "lucide-react"; // Icons
 
 const ISSUER_URL = "http://localhost:11003"
 
@@ -38,6 +41,10 @@ const IssuerExternal: React.FC = () => {
   const [holderLabel, setHolderLabel] = useState("")
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isValidOpen, setIsValidOpen] = useState(false)
+  const [schemaAttributes, setSchemaAttributes] = useState<string[]>([]);
+  const [formData, setFormData] = useState<Record<string, string>>({});
+  const [isInputOpen, setIsInputOpen] = useState(false);
+  const [isReminderOpen, setIsReminderOpen] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -59,6 +66,37 @@ const IssuerExternal: React.FC = () => {
 
     fetchData();
   }, []);
+
+  useEffect(() => {
+    const fetchAttributes = async () => {
+      try {
+        const data = await fetchSchemaAndCredDefIds(ISSUER_URL);
+        if (data.schemaDetails.length > 0) {
+          setSchemaAttributes(data.schemaDetails[0].attributes);
+        }
+      } catch (error) {
+        console.error("Error fetching schema attributes:", error);
+      }
+    };
+    fetchAttributes();
+  }, []);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>, attr: string) => {
+    setFormData((prev) => ({ ...prev, [attr]: e.target.value }));
+  };
+
+  const handleSubmit = async (label: string) => {
+    try {
+      await fetch("/api/databasesApi/dbCredentials", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: label, attributes: formData }), // Save formData
+      });
+
+    } catch (error) {
+      console.error("Error storing credentials:", error);
+    }
+  };
 
 
   const handleLoginWithWallet = async () => {
@@ -96,14 +134,20 @@ const IssuerExternal: React.FC = () => {
             const getHolderInformation = await fetch(`/api/databasesApi/dbCredentials?email=${event.data.data.label}`);
             const userInformation = await getHolderInformation.json();
 
-            if(userInformation[0].connectionId === null && userInformation[0].credExchangeId === null) {
+            if (userInformation.length === 0) {
+              setIsInputOpen(true);
+              deleteConnections(ISSUER_URL, getConnectionId)
+              return;
+            }
+
+            if (userInformation[0].connectionId === null && userInformation[0].credExchangeId === null) {
               console.log("🔍 Sending to API:", { email: event.data.data.label, getConnectionId });
               await fetch("/api/databasesApi/dbCredentials", {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email: event.data.data.label, connectionId: getConnectionId }),
               });
-  
+
               setConnectionId(getConnectionId);
               console.log(`🔗 Found connection ID: ${getConnectionId}`);
             } else {
@@ -264,6 +308,63 @@ const IssuerExternal: React.FC = () => {
           )}
         </ul>
       </div>
+
+      <AlertDialog open={isInputOpen} onOpenChange={setIsInputOpen}>
+        <AlertDialogContent className="max-w-md p-6">
+          <AlertDialogHeader className="flex items-center gap-2">
+            <PencilIcon className="text-blue-500" size={24} /> {/* Warning Icon */}
+            <AlertDialogTitle>Upload Information</AlertDialogTitle>
+          </AlertDialogHeader>
+          <AlertDialogDescription className="text-gray-600">
+            Your email could not be found on the database. Please input your details as follow
+            and upload any relevant documents.
+          </AlertDialogDescription>
+          {schemaAttributes.map((attr, index) => (
+            <div key={index} className="mb-4">
+              <Label htmlFor={`attr-${attr}`} className="block mb-2">{attr}</Label>
+              <Input
+                type="text"
+                id={`attr-${attr}`}
+                placeholder={`Enter value for ${attr}`}
+                value={formData[attr] || ""}
+                onChange={(e) => handleChange(e, attr)}
+              />
+            </div>
+          ))}
+          <div className="mb-4">
+            <Label htmlFor="file-upload" className="block mb-2 flex items-center gap-2">
+              <UploadIcon size={18} className="text-gray-500" /> Upload Document
+            </Label>
+            <Input
+              type="file"
+              id="file-upload"
+              className="border rounded p-2 w-full"
+              onChange={(e) => console.log()} // For display purposes only
+            />
+          </div>
+          <AlertDialogFooter className="mt-4">
+            <AlertDialogAction onClick={() => { handleSubmit(holderLabel); setIsDialogOpen(false); setIsReminderOpen(true) }}>Submit</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={isReminderOpen} onOpenChange={setIsReminderOpen}>
+        <AlertDialogContent className="max-w-md p-6">
+          <AlertDialogHeader className="flex items-center gap-2">
+            <CheckCircle className="text-green-500" size={24} /> {/* Success Icon */}
+            <AlertDialogTitle>Submission Successful</AlertDialogTitle>
+          </AlertDialogHeader>
+          <AlertDialogDescription className="text-gray-600">
+            Your information has been submitted successfully. We will check for its validity,
+            which may take up to a day. You will receive a response regarding your credential
+            via email.
+          </AlertDialogDescription>
+          <AlertDialogFooter className="mt-4">
+            <AlertDialogAction onClick={() => setIsReminderOpen(false)}>OK</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <AlertDialogContent className="max-w-md p-6">
           <AlertDialogHeader className="flex items-center gap-2">
