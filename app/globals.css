@@ -70,3 +70,61 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+@keyframes scaleFade {
+  0% {
+      opacity: 0;
+      transform: scale(0.8);
+  }
+  100% {
+      opacity: 1;
+      transform: scale(1);
+  }
+}
+
+.animate-scale-fade {
+  animation: scaleFade 1s ease-out;
+}
+
+.custom-company-font {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  position: relative; /* Needed for absolute positioning of underline */
+  padding-bottom: 5px; /* Add some space for the underline */
+  animation: shadowMove 3s ease-in-out infinite alternate;
+}
+
+.custom-company-font::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, #00c6ff, #007bff, #ff00ff); /* Gradient color */
+}
+
+@keyframes gradientUnderline {
+  0% {
+      background-position: 0% 50%;
+  }
+  50% {
+      background-position: 100% 50%;
+  }
+  100% {
+      background-position: 0% 50%;
+  }
+}
+
+@keyframes shadowMove {
+  from {
+      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+  }
+  to {
+      text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.2);
+  }
+}

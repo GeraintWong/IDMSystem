@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (!walletSection) throw new Error("❌ Element 'walletDetailsSection' not found!");
 
                     walletSection.classList.remove('d-none');
-                    walletSection.innerHTML = "<h3>Your Credentials</h3>";
+                    walletSection.innerHTML = "<h3>Verified Credentials</h3>";
 
                     walletData.WalletCredentials.forEach(cred => {
                         walletSection.innerHTML += `
@@ -352,7 +352,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     if (!walletSection) throw new Error("❌ Element 'walletDetailsSection' not found!");
 
                     walletSection.classList.remove('d-none');
-                    walletSection.innerHTML = "<h3>Your Credentials</h3>";
+                    walletSection.innerHTML = "<h3>Verified Credentials</h3>";
 
                     walletData.WalletCredentials.forEach(cred => {
                         walletSection.innerHTML += `
@@ -365,7 +365,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
                 // Reject button event listener
                 document.getElementById("rejectShare").onclick = () => {
-                    console.log("❌ User rejected sharing credentials.");
                     alert("You declined to share your credentials.");
                     document.getElementById("proofRequestSection").classList.add('d-none');
                 };

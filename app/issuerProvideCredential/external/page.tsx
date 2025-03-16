@@ -20,7 +20,7 @@ import {
 import { CheckCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ClipboardCopy, Loader2, AlertTriangle, Info, PencilIcon, UploadIcon } from "lucide-react"; // Icons
+import { ClipboardCopy, Loader2, AlertTriangle, Info, PencilIcon, UploadIcon, ShieldCheck, IdCard } from "lucide-react"; // Icons
 
 const ISSUER_URL = "http://localhost:11003"
 
@@ -45,6 +45,8 @@ const IssuerExternal: React.FC = () => {
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [isInputOpen, setIsInputOpen] = useState(false);
   const [isReminderOpen, setIsReminderOpen] = useState(false)
+  const [showDeveloperTools, setShowDeveloperTools] = useState(false);
+  const [showDeveloperToolsDialog, setShowDeveloperToolsDialog] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -245,6 +247,12 @@ const IssuerExternal: React.FC = () => {
                   await deletePresentProof(ISSUER_URL, presExId)
                   return;
                 }
+                let status = "valid"
+                await fetch("/api/databasesApi/dbCredentials", {
+                  method: "PUT",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ email: label, status: status }),
+                });
                 await deleteConnections(ISSUER_URL, extraConnectionId)
                 await deletePresentProof(ISSUER_URL, presExId);
                 await sendCredential(ISSUER_URL, userInformation[0].connectionId, userInformation[0].attributes, "", false, fetchSchemaAndCred.schemaDetails[0].schemaId, fetchedCredDefId, false);
@@ -290,24 +298,129 @@ const IssuerExternal: React.FC = () => {
 
 
   return (
-    <div className="flex min-h-screen bg-gray-900 text-white p-6">
-      {/* Left Section: Schema List */}
-      <div className="w-1/3 p-6 bg-gray-800 rounded-lg shadow-lg overflow-y-auto">
-        <h2 className="text-xl font-semibold mb-4">Schema & Credential Info</h2>
-        <ul>
-          {schemaDetails && schemaDetails.length > 0 ? (
-            schemaDetails.map((schema, index) => (
-              <li key={index} className="p-3 border-b border-gray-700">
-                <span className="block font-semibold">{schema.schemaName}</span>
-                <span className="block text-sm text-gray-400">Schema ID: {schema.schemaId}</span>
-                <span className="block text-sm text-gray-400">Cred Def ID: {schema.credDefId}</span>
-              </li>
-            ))
-          ) : (
-            <p>Loading schema details...</p>
-          )}
-        </ul>
+    <div className="min-h-screen bg-gradient-to-br from-blue-200 to-purple-200 text-gray-800 p-6">
+      <header className="w-full py-6 bg-gradient-to-r from-blue-200 to-purple-200 shadow-md mb-8 relative">
+        <div className="absolute left-4 top-1/2 transform -translate-y-1/2">
+          {/* Add decorative element here (e.g., stylized icon) */}
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4m-2 2h12m-6-4h6" />
+          </svg>
+        </div>
+        <div className="container mx-auto text-center">
+          <h1 className="text-3xl font-semibold text-gray-800 mb-1">IdentityKu</h1>
+          <p className="text-lg text-gray-600">Securely issue and manage your digital credentials with Aries technology.</p>
+        </div>
+        <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
+          {/* Add decorative element here (e.g., stylized icon) */}
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+      </header>
+
+      <div className="flex flex-col items-center justify-center w-full">
+        <div className="max-w-md w-full p-8 bg-gradient-to-br from-gray-200 to-gray-100 rounded-2xl shadow-lg text-center border border-gray-300 backdrop-blur-md bg-opacity-80">
+          <ShieldCheck className="mx-auto mb-4 text-4xl text-blue-500" />
+          <h2 className="text-3xl font-semibold mb-6 text-gray-800">Get Your Credential</h2>
+          <p className="mb-4 text-gray-600 leading-relaxed">
+            You need a Credon Basic Identity credential to proceed for verification and subsequent obtaining credential.
+          </p>
+          <div className="mt-6">
+            <Button
+              onClick={handleLoginWithWallet}
+              disabled={loading}
+              className={`w-full px-6 py-3 text-lg font-semibold bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 transition-colors duration-300 ${loading ? "opacity-70 cursor-not-allowed" : ""}`}
+            >
+              {loading ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  Connecting...
+                </span>
+              ) : (
+                "Get credential with Credon"
+              )}
+            </Button>
+          </div>
+          <p className="text-sm text-gray-500 mt-3">
+            Your email address will be used as your unique identifier and accessed for credential verification.
+          </p>
+          <button
+            className="text-sm mt-8 text-blue-600 hover:text-blue-500 hover:underline transition-colors duration-200"
+            onClick={() => setShowDeveloperToolsDialog(true)}
+          >
+            Show Developer Tools
+          </button>
+        </div>
       </div>
+
+      <AlertDialog open={showDeveloperToolsDialog} onOpenChange={setShowDeveloperToolsDialog}>
+        <AlertDialogContent className="max-w-md p-6 bg-gray-100 rounded-lg">
+          {schemaDetails && schemaDetails.length > 0 && (
+            <div>
+              <div className="text-center mb-6">
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <Info className="text-blue-500" size={25} />
+                  <AlertDialogTitle className="text-2xl font-semibold text-gray-800">
+                    Developer Tools
+                  </AlertDialogTitle>
+                </div>
+                <p className="text-xl font-semibold text-gray-800">
+                  {schemaDetails[0]?.schemaName || "Loading..."}
+                </p>
+              </div>
+              <AlertDialogDescription className="text-center text-gray-600 mb-4">
+                Use these IDs to verify credentials on your website.
+              </AlertDialogDescription>
+              <hr className="my-4 border-gray-300" />
+              <div className="mt-4">
+                <div className="flex items-center mb-2">
+                  <IdCard className="mr-2 text-gray-500" size={16} />
+                  <span className="text-sm font-medium text-gray-700">Schema ID:</span>
+                </div>
+                <div className="flex items-center">
+                  <input
+                    type="text"
+                    value={schemaDetails[0]?.schemaId || ""}
+                    readOnly
+                    className="flex-grow bg-gray-200 border border-gray-300 rounded p-2 text-sm text-gray-800"
+                  />
+                  <button
+                    className="ml-2 bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded text-xs flex items-center"
+                    onClick={() => navigator.clipboard.writeText(schemaDetails[0]?.schemaId || "")}
+                  >
+                    <ClipboardCopy className="mr-1" size={14} />
+                    Copy
+                  </button>
+                </div>
+              </div>
+              <div className="mt-4">
+                <div className="flex items-center mb-2">
+                  <IdCard className="mr-2 text-gray-500" size={16} />
+                  <span className="text-sm font-medium text-gray-700">Cred Def ID:</span>
+                </div>
+                <div className="flex items-center">
+                  <input
+                    type="text"
+                    value={schemaDetails[0]?.credDefId || ""}
+                    readOnly
+                    className="flex-grow bg-gray-200 border border-gray-300 rounded p-2 text-sm text-gray-800"
+                  />
+                  <button
+                    className="ml-2 bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded text-xs flex items-center"
+                    onClick={() => navigator.clipboard.writeText(schemaDetails[0]?.credDefId || "")}
+                  >
+                    <ClipboardCopy className="mr-1" size={14} />
+                    Copy
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          <AlertDialogFooter className="mt-6">
+            <AlertDialogAction onClick={() => setShowDeveloperToolsDialog(false)}>Close</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={isInputOpen} onOpenChange={setIsInputOpen}>
         <AlertDialogContent className="max-w-md p-6">
@@ -411,7 +524,7 @@ const IssuerExternal: React.FC = () => {
       </AlertDialog>
 
 
-      <Button onClick={handleLoginWithWallet} disabled={loading} className="px-6 py-3 text-lg">
+      {/* <Button onClick={handleLoginWithWallet} disabled={loading} className="px-6 py-3 text-lg">
         {loading ? (
           <span className="flex items-center gap-2">
             <Loader2 className="h-5 w-5 animate-spin" />
@@ -420,7 +533,7 @@ const IssuerExternal: React.FC = () => {
         ) : (
           "Login with Aries Wallet"
         )}
-      </Button>
+      </Button> */}
     </div>
   );
 };

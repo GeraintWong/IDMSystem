@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { getConnections, getPresentProof, deletePresentProof } from "@/app/api/helper/helper";
+import { getConnections, getPresentProof, deletePresentProof, deleteConnections } from "@/app/api/helper/helper";
 import { createInvitation } from "@/app/api/invitation/createInvitation";
 import { sendProofRequest } from "@/app/api/presentproof/verifierApi/sendProofRequest";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ const VERIFIER_URL = "http://localhost:11002";
 
 const VerifierExternal: React.FC = () => {
   const [loading, setLoading] = useState(false);
-  const [connectionId, setConnectionId] = useState<string | null>(null);
+  const [connectionId, setConnectionId] = useState("")
   const [presExId, setPresExId] = useState<string | null>(null);
   const [proofState, setProofState] = useState<string | null>(null);
   const [isVerified, setIsVerified] = useState<boolean | null>(null);
@@ -104,6 +104,7 @@ const VerifierExternal: React.FC = () => {
 
                 // Delete proof record after successful verification
                 await deletePresentProof(VERIFIER_URL, presExId);
+                await deleteConnections(VERIFIER_URL, connectionId)
 
                 // Redirect to verifiedWebsite.tsx
                 router.push("/verifier/verifiedWebsite");
@@ -124,26 +125,37 @@ const VerifierExternal: React.FC = () => {
   }, [presExId, proofState]);
 
   return (
-    <div className="flex min-h-screen bg-gray-900 text-white p-6">
-      <div className="flex-1 flex flex-col justify-center items-center">
-        <Button onClick={handleLoginWithWallet} disabled={loading} className="px-6 py-3 text-lg">
-          {loading ? (
-            <span className="flex items-center gap-2">
-              <Loader2 className="h-5 w-5 animate-spin" />
-              Connecting...
-            </span>
-          ) : (
-            "Login with Aries Wallet"
-          )}
-        </Button>
-
-        {presExId && <p className="mt-4">Proof Exchange ID: {presExId}</p>}
-        {proofState && <p className="mt-2">Proof State: {proofState}</p>}
-        {isVerified !== null && (
-          <p className="mt-2">
-            Credential Verified: {isVerified ? "✅ Yes" : "❌ No"}
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white flex">
+      {/* Left Side (Branding/Information) */}
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-r from-blue-900 to-blue-800 p-12 flex flex-col justify-center items-center">
+        <div className="text-center">
+        <div className="text-4xl font-bold mb-6 text-white animate-scale-fade custom-company-font">NEXORA</div>
+          <h2 className="text-3xl font-semibold mb-4">Secure Login with Credon</h2>
+          <p className="text-lg text-gray-300">
+            Access your account securely using Credon. Experience seamless and private authentication.
           </p>
-        )}
+        </div>
+      </div>
+
+      {/* Right Side (Login Form) */}
+      <div className="flex-1 flex flex-col justify-center items-center p-8 lg:p-16">
+        <div className="max-w-md w-full">
+          <h3 className="text-2xl font-semibold mb-6 text-center">Sign In</h3>
+          <Button
+            onClick={handleLoginWithWallet}
+            disabled={loading}
+            className="w-full px-6 py-3 text-lg bg-blue-600 hover:bg-blue-700"
+          >
+            {loading ? (
+              <span className="flex items-center gap-2">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Connecting...
+              </span>
+            ) : (
+              "Login with Credon"
+            )}
+          </Button>
+        </div>
       </div>
     </div>
   );

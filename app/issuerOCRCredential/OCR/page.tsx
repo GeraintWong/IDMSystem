@@ -74,18 +74,18 @@ const IDCardOCR: React.FC = () => {
                 const canvas = document.createElement("canvas");
                 const ctx = canvas.getContext("2d");
                 if (!ctx) return reject("Failed to get canvas context");
-    
+
                 canvas.width = img.width;
                 canvas.height = img.height;
                 ctx.drawImage(img, 0, 0, img.width, img.height);
-    
+
                 // Apply preprocessing (e.g., masking top-right area)
                 const boxWidth = canvas.width * 0.4;
                 const boxHeight = canvas.height * 0.3;
                 const xStart = canvas.width - boxWidth;
                 ctx.fillStyle = "white";
                 ctx.fillRect(xStart, 0, boxWidth, boxHeight);
-    
+
                 const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                 const data = imageData.data;
                 for (let i = 0; i < data.length; i += 4) {
@@ -93,17 +93,17 @@ const IDCardOCR: React.FC = () => {
                     data[i] = data[i + 1] = data[i + 2] = avg; // Apply grayscale
                 }
                 ctx.putImageData(imageData, 0, 0);
-    
+
                 // Apply binarization (thresholding)
                 ctx.globalCompositeOperation = "difference";
                 ctx.fillStyle = "white";
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.globalCompositeOperation = "source-over";
-    
+
                 const processedImage = canvas.toDataURL();
                 resolve(processedImage);
             };
-    
+
             img.onerror = () => reject("Failed to load image");
             img.src = imageData;
         });
@@ -145,6 +145,10 @@ const IDCardOCR: React.FC = () => {
         return "Not Found";
     };
 
+    const isMissingInfo = () => {
+        return name === "Not Found" || personId === "Not Found" || dob === "Not Found";
+    };
+
 
     const extractDOB = (text: string): string => {
         const dobPattern = /DOB:\s*(\d{1,2}-[A-Za-z]{3}-\d{4})/;
@@ -167,7 +171,7 @@ const IDCardOCR: React.FC = () => {
                 "Person ID": personId,
                 "Name": name,
                 "DOB": dob
-              };
+            };
 
             await sendCredential(ISSUER_URL, holderConnectionId, attributeMapping, "", false, data.schemaDetails[0].schemaId, credDefId, false);
             console.log("✅ Credential sent successfully.", attributeMapping);
@@ -178,30 +182,58 @@ const IDCardOCR: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-6">
-            <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
-                <h2 className="text-2xl font-bold text-center mb-4">OCR Issuer</h2>
+        <div className="min-h-screen bg-gradient-to-br from-indigo-800 to-indigo-700 text-gray-800 flex flex-col items-center justify-center p-6">
+            <div className="bg-gray-50 p-8 rounded-xl shadow-md w-full max-w-md border border-gray-200">
+                <h2 className="text-3xl font-semibold text-center mb-6 text-indigo-700">Credential Verification</h2>
 
-                <input type="file" accept="image/*" onChange={handleFileChange} className="mb-4 w-full p-2 border rounded-md" />
-                {imagePreview && <img src={imagePreview} alt="Uploaded" className="w-full rounded-lg shadow-md mb-4" />}
+                <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="mb-6 w-full p-3 border rounded-lg focus:ring-indigo-400 focus:border-indigo-400 text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                />
 
-                <button onClick={extractText} className="w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 transition" disabled={!image || loading}>
-                    {loading ? `Processing... (${progress}%)` : "Extract Text"}
+                {imagePreview && (
+                    <img src={imagePreview} alt="Uploaded" className="w-full rounded-xl shadow-lg mb-6" />
+                )}
+
+                <button
+                    onClick={extractText}
+                    className="w-full bg-indigo-500 text-white p-3 rounded-lg hover:bg-indigo-600 transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+                    disabled={!image || loading}
+                >
+                    {loading ? (
+                        <div className="flex items-center justify-center">
+                            <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700 mr-2">
+                                <div className="bg-indigo-500 h-2.5 rounded-full" style={{ width: `${progress}%` }}></div>
+                            </div>
+                            <span className="text-sm">
+                                {progress}%
+                            </span>
+                        </div>
+                    ) : (
+                        "Verify Credential"
+                    )}
                 </button>
 
-                {loading && <div className="text-center mt-2 text-sm text-gray-500">Extracting text... Please wait.</div>}
-
                 {extractedText && (
-                    <div className="mt-4 p-3 border rounded-md bg-gray-50">
-                        <h3 className="text-lg font-semibold">Extracted Information:</h3>
-                        <pre className="mt-2 whitespace-pre-wrap">{extractedText}</pre>
+                    <div className="mt-6 p-4 border rounded-xl bg-gray-100 border-gray-200">
+                        <h3 className="text-lg font-semibold text-indigo-700 mb-2">Extracted Student Information:</h3>
+                        <pre className="mt-2 whitespace-pre-wrap text-sm text-gray-700">{extractedText}</pre>
                     </div>
                 )}
 
                 {confirmation && (
-                    <div className="mt-4">
-                        <p className="text-sm text-gray-600">Please verify the extracted information before proceeding.</p>
-                        <button onClick={handleConfirmAndSend} className="w-full bg-green-600 text-white p-2 rounded-md hover:bg-green-700 transition mt-2">Confirm & Send</button>
+                    <div className="mt-6 p-4 border rounded-xl bg-green-50 border-green-200">
+                        <p className="text-sm text-gray-600 mb-4">Please confirm the extracted student data before submission.</p>
+                        <button
+                            onClick={handleConfirmAndSend}
+                            className="w-full bg-green-500 text-white p-3 rounded-lg hover:bg-green-600 transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={isMissingInfo()}
+                        >
+                            Confirm and Submit
+                        </button>
+                        {isMissingInfo() && <p className="text-red-500 mt-2">Some information is missing.</p>}
                     </div>
                 )}
             </div>
