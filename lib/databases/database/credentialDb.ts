@@ -6,6 +6,7 @@ export function initializeDatabase() {
     db.exec(`
         CREATE TABLE IF NOT EXISTS credentials (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            label TEXT,
             email TEXT NOT NULL,
             attributes TEXT NOT NULL,
             connectionId TEXT,
@@ -23,6 +24,7 @@ export function insertCredential(email: string, attributes: Record<string, strin
 export function getCredentials() {
     return db.prepare("SELECT * FROM credentials").all().map((record: any) => ({
         id: record.id,
+        label: record.label,
         email: record.email,
         attributes: JSON.parse(record.attributes),
         connectionId: record.connectionId,
@@ -75,5 +77,38 @@ export function updateStatus(email: string, status: string): boolean {
         return false;
     }
 }
+
+export function updateLabel(email: string, newLabel: string): boolean {
+    try {
+        console.log(`🛠 Updating label for ${email} to ${newLabel}`);
+        
+        const stmt = db.prepare("UPDATE credentials SET label = ? WHERE email = ?");
+        const result = stmt.run(newLabel, email);
+        
+        console.log("🔄 Update result:", result);
+        
+        return result.changes > 0;
+    } catch (error) {
+        console.error("Database update error:", error);
+        return false;
+    }
+}
+
+export function updateEmailByLabel(label: string, newEmail: string): boolean {
+    try {
+        console.log(`🛠 Updating email for label ${label} to ${newEmail}`);
+        
+        const stmt = db.prepare("UPDATE credentials SET email = ? WHERE label = ?");
+        const result = stmt.run(newEmail, label);
+        
+        console.log("🔄 Update result:", result);
+        
+        return result.changes > 0;
+    } catch (error) {
+        console.error("Database update error:", error);
+        return false;
+    }
+}
+
 
 initializeDatabase();

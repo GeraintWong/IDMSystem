@@ -125,9 +125,10 @@ document.getElementById("verifyButton").addEventListener('click', async () => {
         body: JSON.stringify({ email, otp })
     });
     if (response.ok) {
-        const startAgentResponse = await startAgent(email)
+        const hashedEmail = await hashEmail(email)
+        const startAgentResponse = await startAgent(hashedEmail)
         if (startAgentResponse.ok) {
-            submitStartCredential(email)
+            submitStartCredential(hashedEmail)
         }
     }
     const data = await response.json();
@@ -141,8 +142,13 @@ async function startAgent(emailInput) {
         alert("Please enter an email address.");
         return;
     }
-
-    const walletName = emailInput.split("@")[0];
+    const walletName = await getUUIDFromServer();
+    await fetch('http://localhost:4000/api/saveUserCredentials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uuid: walletName, email: emailInput }),
+    });
+    // const walletName = emailInput
 
     // Show full-screen loading overlay
     loadingOverlay.classList.remove("d-none");
@@ -522,6 +528,7 @@ async function verifyPassword(inputPassword) {
                 console.log("✅ Access Granted!");
                 resolve(true);  // Password correct
             } else {
+                alert("Password incorrect")
                 console.log("❌ Incorrect Password!");
                 resolve(false); // Password incorrect
             }
@@ -552,6 +559,39 @@ async function getStoredPasswordData() {
     });
 }
 
+//Email hashing stuff
+async function hashEmail(email) {
+    if (!email) {
+        throw new Error("Email cannot be empty or null.");
+    }
+
+    const encoder = new TextEncoder();
+    const data = encoder.encode(email);
+
+    try {
+        const hashBuffer = await crypto.subtle.digest("SHA-256", data); // Use SHA-256 (or better)
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashHex = hashArray
+            .map((b) => b.toString(16).padStart(2, "0"))
+            .join("");
+        return hashHex;
+    } catch (error) {
+        console.error("Hashing error:", error);
+        throw error; // Rethrow the error to be handled by the caller
+    }
+}
+
+//UUID stuff
+async function getUUIDFromServer() {
+    try {
+        const response = await fetch('http://localhost:4000/generate-uuid'); // Replace with your server's URL
+        const data = await response.json();
+        return data.uuid;
+    } catch (error) {
+        console.error('Error fetching UUID:', error);
+        return null;
+    }
+}
 
 
 

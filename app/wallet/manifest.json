@@ -8,6 +8,11 @@
     "activeTab",
     "storage"
   ],
+  "icons": {
+    "16": "icons/elephant.png",
+    "48": "icons/elephant.png",
+    "128": "icons/elephant.png"
+  },
   "host_permissions": [
     "https://*/*",
     "http://*/*"

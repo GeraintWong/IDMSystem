@@ -7,16 +7,15 @@ export function initializeDatabase() {
         CREATE TABLE IF NOT EXISTS credon (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             label TEXT NOT NULL,
-            connectionId TEXT NOT NULL,
-            state TEXT NOT NULL
+            email TEXT NOT NULL
         )
     `);
 }
 
 // Insert a new credential with default state as 'active'
-export function insertCredential(label: string, connectionId: string, state: string) {
-    const stmt = db.prepare("INSERT INTO credon (label, connectionId, state) VALUES (?, ?, ?)");
-    stmt.run(label, connectionId, state);
+export function insertCredential(label: string, email: string) {
+    const stmt = db.prepare("INSERT INTO credon (label, email) VALUES (?, ?)");
+    stmt.run(label, email);
 }
 
 // Update credential state (e.g., set to 'revoked')
@@ -30,8 +29,7 @@ export function getCredentials() {
     return db.prepare("SELECT * FROM credon").all().map((record: any) => ({
         id: record.id,
         label: record.label,
-        connectionId: record.connectionId,
-        state: record.state,
+        email: record.email,
     }));
 }
 

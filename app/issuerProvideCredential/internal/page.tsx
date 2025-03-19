@@ -202,7 +202,7 @@ const IssuerInternal: React.FC = () => {
 
     const handleSubmit = async () => {
         try {
-            const label = holderLabel.split("@")[0];
+            const label = await hashEmail(holderLabel)
             await fetch("/api/databasesApi/dbCredentials", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -217,7 +217,7 @@ const IssuerInternal: React.FC = () => {
 
     const handleRevocation = async () => {
         try {
-            const label = revokeHolderLabel.split("@")[0];
+            const label = await hashEmail(revokeHolderLabel)
             const getHolderInformation = await fetch(`/api/databasesApi/dbCredentials?email=${label}`);
             const userInformation = await getHolderInformation.json();
             const credExchangeId = userInformation[0].credExchangeId;
@@ -243,7 +243,7 @@ const IssuerInternal: React.FC = () => {
 
     const handleReinstate = async () => {
         try {
-            const label = revokeHolderLabel.split("@")[0];
+            const label = await hashEmail(revokeHolderLabel)
             const getHolderInformation = await fetch(`/api/databasesApi/dbCredentials?email=${label}`);
             let status = "reinstated"
 
@@ -257,6 +257,27 @@ const IssuerInternal: React.FC = () => {
             console.error("Error reinstating credentials", error)
         }
     }
+
+    async function hashEmail(email: string): Promise<string> {
+        if (!email) {
+          throw new Error("Email cannot be empty or null.");
+        }
+      
+        const encoder = new TextEncoder();
+        const data = encoder.encode(email);
+      
+        try {
+          const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+          const hashArray = Array.from(new Uint8Array(hashBuffer));
+          const hashHex = hashArray
+            .map((b) => b.toString(16).padStart(2, "0"))
+            .join("");
+          return hashHex;
+        } catch (error) {
+          console.error("Hashing error:", error);
+          throw error;
+        }
+      }
 
     return (
         <div className="min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200">

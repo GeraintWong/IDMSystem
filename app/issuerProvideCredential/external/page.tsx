@@ -47,6 +47,7 @@ const IssuerExternal: React.FC = () => {
   const [isReminderOpen, setIsReminderOpen] = useState(false)
   const [showDeveloperTools, setShowDeveloperTools] = useState(false);
   const [showDeveloperToolsDialog, setShowDeveloperToolsDialog] = useState(false);
+  const [userEmail, setUserEmail] = useState("");
 
   useEffect(() => {
     const fetchData = async () => {
@@ -133,23 +134,17 @@ const IssuerExternal: React.FC = () => {
           if (connection) {
             const getConnectionId = connection.connection_id;
 
-            const getHolderInformation = await fetch(`/api/databasesApi/dbCredentials?email=${event.data.data.label}`);
-            const userInformation = await getHolderInformation.json();
+            const getHolderCredon = await fetch(`/api/databasesApi/dbCredentials?label=${event.data.data.label}`);
+            const userInformation  = await getHolderCredon.json()
+
+            // if (userInformation.length === 0) {
+            //   setIsInputOpen(true);
+            //   deleteConnections(ISSUER_URL, getConnectionId)
+            //   return;
+            // }
 
             if (userInformation.length === 0) {
-              setIsInputOpen(true);
-              deleteConnections(ISSUER_URL, getConnectionId)
-              return;
-            }
-
-            if (userInformation[0].connectionId === null && userInformation[0].credExchangeId === null) {
-              console.log("🔍 Sending to API:", { email: event.data.data.label, getConnectionId });
-              await fetch("/api/databasesApi/dbCredentials", {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email: event.data.data.label, connectionId: getConnectionId }),
-              });
-
+              console.log("🔍 Sending to API:", { label: event.data.data.label, getConnectionId });
               setConnectionId(getConnectionId);
               console.log(`🔗 Found connection ID: ${getConnectionId}`);
             } else {
@@ -222,10 +217,37 @@ const IssuerExternal: React.FC = () => {
               if (!userEmail) {
                 return console.error("No user email")
               }
-              const label = userEmail.split("@")[0];
 
-              const getHolderInformation = await fetch(`/api/databasesApi/dbCredentials?email=${label}`);
+              const getHolderInformation = await fetch(`/api/databasesApi/dbCredentials?email=${userEmail}`);
               const userInformation = await getHolderInformation.json();
+
+              if (userInformation.length === 0) {
+                const getHolderCredon = await fetch(`/api/databasesApi/dbCredentials?label=${holderLabel}`);
+                const userInformation  = await getHolderCredon.json()
+                if(userInformation.length === 0){
+                  setUserEmail(userEmail)
+                  setIsInputOpen(true);
+                  await deleteConnections(ISSUER_URL, connectionId)
+                  await deletePresentProof(ISSUER_URL, presExId);
+                  return;
+                } else {
+                  await fetch("/api/databasesApi/dbCredentials", {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ label: holderLabel, newEmail: userEmail }),
+                  });
+                  await deleteConnections(ISSUER_URL, connectionId)
+                  await deletePresentProof(ISSUER_URL, presExId);
+                  return;
+                }
+              }
+
+              await fetch("/api/databasesApi/dbCredentials", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: userEmail, label: holderLabel, connectionId: connectionId }),
+              });
+
               const fetchSchemaAndCred = await fetchSchemaAndCredDefIds(ISSUER_URL);
               const fetchedCredDefId = fetchSchemaAndCred.credDefIds[0];
               const holderConnectionId = proof.connection_id;
@@ -251,7 +273,7 @@ const IssuerExternal: React.FC = () => {
                 await fetch("/api/databasesApi/dbCredentials", {
                   method: "PUT",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ email: label, status: status }),
+                  body: JSON.stringify({ email: userEmail, status: status }),
                 });
                 await deleteConnections(ISSUER_URL, extraConnectionId)
                 await deletePresentProof(ISSUER_URL, presExId);
@@ -273,7 +295,7 @@ const IssuerExternal: React.FC = () => {
                 await fetch("/api/databasesApi/dbCredentials", {
                   method: "PUT",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ email: holderLabel, credExchangeId: credExchangeId }),
+                  body: JSON.stringify({ email: userEmail, credExchangeId: credExchangeId }),
                 });
                 console.log("✅ Credential Exchange ID:", credExchangeId);
                 deleteIssueCredential(ISSUER_URL, credExchangeId)
@@ -456,7 +478,7 @@ const IssuerExternal: React.FC = () => {
             />
           </div>
           <AlertDialogFooter className="mt-4">
-            <AlertDialogAction onClick={() => { handleSubmit(holderLabel); setIsDialogOpen(false); setIsReminderOpen(true) }}>Submit</AlertDialogAction>
+            <AlertDialogAction onClick={() => { handleSubmit(userEmail); setIsDialogOpen(false); setIsReminderOpen(true) }}>Submit</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

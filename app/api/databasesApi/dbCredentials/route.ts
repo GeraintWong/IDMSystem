@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { insertCredential, getCredentials, updateConnectionId, updateCredExchangeId, updateStatus } from "@/lib/databases/database/credentialDb";
+import { insertCredential, getCredentials, updateConnectionId, updateCredExchangeId, updateStatus, updateLabel, updateEmailByLabel } from "@/lib/databases/database/credentialDb";
 
 export async function POST(req: Request) {
     try {
@@ -15,10 +15,16 @@ export async function GET(req: Request) {
     try {
         const url = new URL(req.url);
         const email = url.searchParams.get("email"); 
-                
-        let credentials = getCredentials();
+        const label = url.searchParams.get("label");
+
+        let credentials = getCredentials(); // Fetch all credentials
+
         if (email) {
             credentials = credentials.filter((config: any) => config.email === email);
+        }
+        
+        if (label) {
+            credentials = credentials.filter((config: any) => config.label === label);
         }
 
         return NextResponse.json(credentials);
@@ -27,15 +33,24 @@ export async function GET(req: Request) {
     }
 }
 
+
 export async function PUT(req: Request) {
     try {
-        const { email, connectionId, credExchangeId, status } = await req.json();
+        const { email, connectionId, newEmail, credExchangeId, status, label } = await req.json();
 
         if (!email) {
             return NextResponse.json({ error: "Email is required" }, { status: 400 });
         }
 
         let updated = false;
+
+        if (label && newEmail) {
+            updated = updateEmailByLabel(label, newEmail) || updated;
+        }
+
+        if (label) {
+            updated = updateLabel(email, label) || updated;
+        }
 
         if (connectionId) {
             updated = updateConnectionId(email, connectionId) || updated;

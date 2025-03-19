@@ -7,6 +7,7 @@ import { acceptInvitation } from '../api/invitation/acceptInvitation.ts'; // Imp
 import { sendCredentialProposal } from '../api/issueCredentials/sendProposal/sendProposal.ts';
 import { sendPresentation } from '../api/presentproof/holderApi/sendPresentation.ts'
 import { extractText } from '../../lib/OCR.ts'
+import { v4 as uuidv4 } from 'uuid';
 
 import * as dotenv from 'dotenv';
 dotenv.config();
@@ -325,6 +326,7 @@ const transporter = nodemailer.createTransport({
       delete otpStore[email];
       res.json({ message: "OTP verified. Proceed with agent creation." });
     } else {
+      alert("Invalid OTP")
       res.status(400).json({ error: "Invalid OTP" });
     }
   });
@@ -371,5 +373,32 @@ const transporter = nodemailer.createTransport({
     }
 });
 
+//UUID type shii
+app.get('/generate-uuid', (req, res) => {
+    const uuid = uuidv4();
+    res.json({ uuid });
+});
+
+app.post('/api/saveUserCredentials', async (req, res) => {
+    try {
+        const { uuid, email } = req.body;
+
+        await fetch("http://localhost:3000/api/databasesApi/dbCredon", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                label: uuid,
+                email: email,
+            }),
+        });
+
+        console.log(`Saving UUID: ${uuid}, Email: ${email}`);
+
+        res.status(200).json({ message: 'Credentials saved successfully' });
+    } catch (error) {
+        console.error('Error saving credentials:', error);
+        res.status(500).json({ error: 'Failed to save credentials' });
+    }
+});
 
 app.listen(4000, () => console.log('Server running on port 4000'));

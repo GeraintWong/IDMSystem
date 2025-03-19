@@ -1,8 +1,21 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { registerSchemaAndCredDef } from "@/app/api/registerschemacred/registerschemacred";
 import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
+import { sendCredential } from "@/app/api/issueCredentials/sendCredential/sendCredential";
+import { getConnections, fetchSchemaAndCredDefIds, getIssueCredential } from "@/app/api/helper/helper";
+import { revokeCredential } from "@/app/api/revokeCredentials/revokeCredentials";
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 
 const ISSUER_URL = "http://localhost:11000";
 
@@ -12,10 +25,37 @@ const IssuerInternal: React.FC = () => {
     const [newAttribute, setNewAttribute] = useState("");
     const [credDefId, setCredDefId] = useState<string | null>(null);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [formData, setFormData] = useState<Record<string, string>>({});
+    const [holderLabel, setHolderLabel] = useState("");
+    const [schemaAttributes, setSchemaAttributes] = useState<string[]>([]);
+
+    const [proofAttributes, setProofAttributes] = useState<string[]>([]);
+    const [tempSelectedAttributes, setTempSelectedAttributes] = useState<string[]>([]);
+    const [selectedAttributes, setSelectedAttributes] = useState<string[]>([]);
+    const [proofCredDefId, setProofCredDefId] = useState("");
+    const [revokeHolderLabel, setRevokeHolderLabel] = useState("");
+    const [isRevokeOpen, setIsRevokeOpen] = useState(false);
+    const [reinstateHolderLabel, setReinstateHolderLabel] = useState("");
+    const [isReinstateOpen, setIsReinstateOpen] = useState(false);
+
+
+    useEffect(() => {
+        const fetchAttributes = async () => {
+            try {
+                const data = await fetchSchemaAndCredDefIds(ISSUER_URL);
+                if (data.schemaDetails.length > 0) {
+                    setSchemaAttributes(data.schemaDetails[0].attributes);
+                }
+            } catch (error) {
+                console.error("Error fetching schema attributes:", error);
+            }
+        };
+        fetchAttributes();
+    }, []);
 
     const handleRegisterSchemaAndCredDef = async () => {
         try {
-            setIsDialogOpen(false); // Close dialog after confirmation
+            setIsDialogOpen(false);
             const result = await registerSchemaAndCredDef(ISSUER_URL, schemaName, attributes, true);
 
             if (!result) {
@@ -36,87 +76,335 @@ const IssuerInternal: React.FC = () => {
             setAttributes((prevAttributes) => [...prevAttributes, newAttribute.trim()]);
             setNewAttribute("");
         }
-    };    
+    };
 
     const handleRemoveAttribute = (attr: string) => {
         setAttributes(attributes.filter((a) => a !== attr));
     };
 
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>, attr: string) => {
+        setFormData((prev) => ({ ...prev, [attr]: e.target.value }));
+    };
+
+    const handleHolderLabelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const email = e.target.value;
+        setHolderLabel(email);
+    };
+
+    const handleRevokeHolderLabelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const email = e.target.value;
+        setRevokeHolderLabel(email);
+    };
+
+    const handleReinstateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const email = e.target.value;
+        setReinstateHolderLabel(email)
+    }
+
+    useEffect(() => {
+        async function fetchSavedConfig() {
+            try {
+                const response = await fetch("/api/databasesApi/dbProofConfig?label=Issuer2"); // Fetch based on label
+                if (!response.ok) throw new Error("Failed to fetch config");
+                const data = await response.json();
+
+                if (data && data.length > 0) {
+                    const latestConfig = data[data.length - 1]; // Get the latest saved config
+                    setProofCredDefId(latestConfig.credDefId);
+                    setSelectedAttributes(latestConfig.attributes);
+                    setTempSelectedAttributes(latestConfig.attributes);
+                }
+            } catch (error) {
+                console.error("Error fetching saved config:", error);
+            }
+        }
+        fetchSavedConfig();
+    }, []);
+
+    const handleSendCredential = async () => {
+        try {
+            const connections = await getConnections(ISSUER_URL);
+            const label = holderLabel.split("@")[0];
+            const connection = connections.find((c) => c.their_label === label);
+            const data = await fetchSchemaAndCredDefIds(ISSUER_URL);
+            const credDefId = data.credDefIds[0];
+
+            if (!connection) {
+                console.error("No connection found for holder:", label);
+                return;
+            }
+
+            if (!credDefId) {
+                console.error("Credential Definition ID is missing.");
+                return;
+            }
+
+            const connectionId = connection.connection_id;
+            await sendCredential(ISSUER_URL, connectionId, formData, "", false, data.schemaDetails[0].schemaId, credDefId, false);
+            console.log("Credential sent successfully.");
+        } catch (error) {
+            console.error("Error sending credential:", error);
+        }
+    };
+
+    const handleSubmit = async () => {
+        try {
+            const label = await hashEmail(holderLabel)
+            await fetch("/api/databasesApi/dbCredentials", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: label, attributes: formData }), // Save formData
+            });
+
+            console.log("Stored:", { email: label, attributes: formData });
+        } catch (error) {
+            console.error("Error storing credentials:", error);
+        }
+    };
+
+    const handleRevocation = async () => {
+        try {
+            const label = await hashEmail(revokeHolderLabel)
+            const connections = await getConnections(ISSUER_URL);
+            const connection = connections.find((c) => c.their_label === label);
+            if (connection) {
+                const getConnectionId = connection.connection_id;
+                const issueCredentialsRecord = await getIssueCredential(ISSUER_URL);
+                const matchingRecord = issueCredentialsRecord.find(
+                    (c) => c.cred_ex_record.connection_id === getConnectionId
+                );
+                if(matchingRecord){
+                    const getCredExchangeId = matchingRecord.cred_ex_record.cred_ex_id;
+                    const data = await fetchSchemaAndCredDefIds(ISSUER_URL);
+                    const credDefId = data.credDefIds[0];
+                    await revokeCredential(ISSUER_URL, getCredExchangeId, credDefId)
+                }
+            }
+        } catch (error) {
+            console.error("Error revoking credentials", error)
+        }
+    }
+
+    const handleReinstate = async () => {
+        try {
+            const label = await hashEmail(revokeHolderLabel)
+            const getHolderInformation = await fetch(`/api/databasesApi/dbCredentials?email=${label}`);
+            let status = "reinstated"
+
+            await fetch("/api/databasesApi/dbCredentials", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: label, status: status }),
+            });
+
+        } catch (error) {
+            console.error("Error reinstating credentials", error)
+        }
+    }
+
+    async function hashEmail(email: string): Promise<string> {
+        if (!email) {
+            throw new Error("Email cannot be empty or null.");
+        }
+
+        const encoder = new TextEncoder();
+        const data = encoder.encode(email);
+
+        try {
+            const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const hashHex = hashArray
+                .map((b) => b.toString(16).padStart(2, "0"))
+                .join("");
+            return hashHex;
+        } catch (error) {
+            console.error("Hashing error:", error);
+            throw error;
+        }
+    }
+
     return (
-        <div className="flex min-h-screen bg-gray-900 text-white p-6">
-            {/* Left Panel - Schema Registration */}
-            <div className="w-1/3 p-6 shadow-lg rounded-lg bg-gray-800 border border-gray-700">
-                <h2 className="text-xl font-semibold mb-4">Register Schema</h2>
+        <div className="min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200">
+            <div className="flex">
+                <aside className="w-64 bg-gray-800 dark:bg-gray-950 text-white p-4">
+                    <h2 className="text-2xl font-semibold mb-6">Credon Management</h2>
+                    <nav>
+                        <ul className="space-y-2">
+                            <li><a href="#" className="block hover:bg-gray-700 p-2 rounded">Dashboard</a></li>
+                            <li><a href="#" className="block hover:bg-gray-700 p-2 rounded">Register Schema</a></li>
+                            <li><a href="#" className="block hover:bg-gray-700 p-2 rounded">Issue Credentials</a></li>
+                            <li><a href="#" className="block hover:bg-gray-700 p-2 rounded">Revoke Credentials</a></li>
+                            <li><a href="#" className="block hover:bg-gray-700 p-2 rounded">Proof Configuration</a></li>
+                        </ul>
+                    </nav>
+                </aside>
 
-                {/* Schema Name Input */}
-                <input
-                    type="text"
-                    placeholder="Enter Schema Name"
-                    value={schemaName}
-                    onChange={(e) => setSchemaName(e.target.value)}
-                    className="w-full p-3 border rounded-md bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                <main className="flex-1 p-8">
+                    <div className="mb-8">
+                        <h1 className="text-3xl font-bold mb-4">Dashboard Overview</h1>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Total Issued Credentials</CardTitle>
+                                    <CardDescription>Number of credentials issued</CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <p className="text-2xl font-semibold">123</p>
+                                </CardContent>
+                            </Card>
+                            {/* ... (Other dashboard cards) ... */}
+                        </div>
+                    </div>
 
-                {/* Attribute Input */}
-                <div className="mt-4 flex">
-                    <input
-                        type="text"
-                        placeholder="Add Attribute"
-                        value={newAttribute}
-                        onChange={(e) => setNewAttribute(e.target.value)}
-                        className="flex-1 p-2 border rounded-md bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <button
-                        onClick={handleAddAttribute}
-                        className="ml-2 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
-                    >
-                        Add
-                    </button>
-                </div>
+                    <div id="registerSchemaSection" className="mb-8">
+                        <h2 className="text-2xl font-semibold mb-4">Register Schema</h2>
+                        <Card>
+                            <CardContent>
+                                <Label htmlFor="schemaName" className="block mt-6 mb-2">Schema Name</Label>
+                                <Input
+                                    type="text"
+                                    id="schemaName"
+                                    placeholder="Enter Schema Name"
+                                    value={schemaName}
+                                    onChange={(e) => setSchemaName(e.target.value)}
+                                    className="mb-4"
+                                />
 
-                {/* Attributes List */}
-                <ul className="mt-3 max-h-40 overflow-auto border-t border-gray-600 divide-y divide-gray-700">
-                    {attributes.map((attr, index) => (
-                        <li key={index} className="flex justify-between p-2 text-white">
-                            {attr}
-                            <button
-                                onClick={() => handleRemoveAttribute(attr)}
-                                className="text-red-500 hover:underline"
-                            >
-                                Remove
-                            </button>
-                        </li>
-                    ))}
-                </ul>
+                                <div className="mb-4">
+                                    <Label htmlFor="newAttribute" className="block mb-2">Add Attribute</Label>
+                                    <div className="flex space-x-2">
+                                        <Input
+                                            type="text"
+                                            id="newAttribute"
+                                            placeholder="Attribute Name"
+                                            value={newAttribute}
+                                            onChange={(e) => setNewAttribute(e.target.value)}
+                                            className="flex-1"
+                                        />
+                                        <Button onClick={handleAddAttribute} variant="secondary">Add</Button>
+                                    </div>
+                                </div>
 
-                {/* Register Schema Button with Dialog */}
-                <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                    <AlertDialogTrigger asChild>
-                        <button className="mt-4 w-full px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600">
-                            Register Schema & Credential Definition
-                        </button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                        <AlertDialogHeader>
-                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                                Registering this schema cannot be undone. Make sure all details are correct before proceeding.
-                            </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={handleRegisterSchemaAndCredDef}>Confirm</AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
+                                <div className="mb-4">
+                                    <Label className="block mb-2">Attributes</Label>
+                                    <ul className="max-h-40 overflow-y-auto border rounded-md ps-2 bg-gray-100 dark:bg-gray-800">
+                                        {attributes.map((attr, index) => (
+                                            <li key={index} className="flex justify-between items-center py-1 border-b last:border-b-0">
+                                                <span>{attr}</span>
+                                                <Button onClick={() => handleRemoveAttribute(attr)} variant="destructive" size="icon">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                                                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                                                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                                                    </svg>
+                                                </Button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
 
-                {/* Display Credential Definition ID */}
-                {credDefId && <p className="mt-4 text-green-500">Credential Definition ID: {credDefId}</p>}
-            </div>
+                                <Button onClick={() => setIsDialogOpen(true)} variant="default">Register Schema & Credential Definition</Button>
+                                <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                Registering this schema cannot be undone. Make sure all details are correct before proceeding.
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                            <AlertDialogAction onClick={handleRegisterSchemaAndCredDef}>Confirm</AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                            </CardContent>
+                        </Card>
+                    </div>
 
-            {/* Right Panel - Placeholder for Future Content */}
-            <div className="w-2/3 flex items-center justify-center">
-                <p className="text-gray-500 text-lg">Right panel (Use this for future functionalities)</p>
+                    <div className="mb-8">
+                        <h2 className="text-2xl font-semibold mb-4">Issue Credentials</h2>
+                        <Card>
+                            <CardContent>
+                                <Label htmlFor="holderEmail" className="block mt-6 mb-2">Email</Label>
+                                <Input
+                                    type="text"
+                                    id="holderEmail"
+                                    placeholder="Enter Credential Email"
+                                    onChange={handleHolderLabelChange}
+                                    className="mb-4"
+                                />
+                                {schemaAttributes.map((attr, index) => (
+                                    <div key={index} className="mb-4">
+                                        <Label htmlFor={`attr-${attr}`} className="block mb-2">{attr}</Label>
+                                        <Input
+                                            type="text"
+                                            id={`attr-${attr}`}
+                                            placeholder={`Enter value for ${attr}`}
+                                            value={formData[attr] || ""}
+                                            onChange={(e) => handleChange(e, attr)}
+                                        />
+                                    </div>
+                                ))}
+                                <div className="flex justify-end space-x-2">
+                                    <Button onClick={handleSubmit} variant="outline">Save</Button>
+                                    <Button onClick={handleSendCredential} variant="default">Send Credential</Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    <div className="mb-8">
+                        <h2 className="text-2xl font-semibold mb-4">Revoke/Reinstate Credentials</h2>
+                        <Card>
+                            <CardContent>
+                                <Label htmlFor="revokeEmail" className="block mt-6 mb-2">Email</Label>
+                                <Input
+                                    type="text"
+                                    id="revokeEmail"
+                                    placeholder="Enter Credential Email"
+                                    onChange={handleRevokeHolderLabelChange}
+                                    className="mb-4"
+                                />
+                                <div className="flex justify-end space-x-2">
+                                    <AlertDialog open={isRevokeOpen} onOpenChange={setIsRevokeOpen}>
+                                        <AlertDialogTrigger asChild>
+                                            <Button variant="destructive">Revoke Credential</Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                <AlertDialogDescription>
+                                                    Revoking {revokeHolderLabel} credential cannot be undone.
+                                                </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                <AlertDialogAction onClick={handleRevocation}>Confirm</AlertDialogAction>
+                                            </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
+                                    <AlertDialog open={isReinstateOpen} onOpenChange={setIsReinstateOpen}>
+                                        <AlertDialogTrigger asChild>
+                                            <Button variant="secondary">Reinstate Credential</Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                <AlertDialogDescription>
+                                                    Your are about to reinstate {revokeHolderLabel} credential.
+                                                </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                <AlertDialogAction onClick={handleReinstate}>Confirm</AlertDialogAction>
+                                            </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </main>
             </div>
         </div>
     );

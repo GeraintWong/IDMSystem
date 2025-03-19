@@ -3,8 +3,8 @@ import { insertCredential, getCredentials, updateCredentialState } from "@/lib/d
 
 export async function POST(req: Request) {
     try {
-        const { label, connectionId, state } = await req.json();
-        insertCredential(label, connectionId, state );
+        const { label, email } = await req.json();
+        insertCredential(label, email );
         return NextResponse.json({ message: "Credential stored successfully" });
     } catch (error) {
         return NextResponse.json({ error: "Failed to insert credential" }, { status: 500 });
