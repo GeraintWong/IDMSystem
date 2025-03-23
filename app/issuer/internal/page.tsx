@@ -164,22 +164,21 @@ const IssuerInternal: React.FC = () => {
 
     const handleRevocation = async () => {
         try {
-            const label = await hashEmail(revokeHolderLabel)
-            const connections = await getConnections(ISSUER_URL);
-            const connection = connections.find((c) => c.their_label === label);
-            if (connection) {
-                const getConnectionId = connection.connection_id;
-                const issueCredentialsRecord = await getIssueCredential(ISSUER_URL);
-                const matchingRecord = issueCredentialsRecord.find(
-                    (c) => c.cred_ex_record.connection_id === getConnectionId
-                );
-                if(matchingRecord){
-                    const getCredExchangeId = matchingRecord.cred_ex_record.cred_ex_id;
-                    const data = await fetchSchemaAndCredDefIds(ISSUER_URL);
-                    const credDefId = data.credDefIds[0];
-                    await revokeCredential(ISSUER_URL, getCredExchangeId, credDefId)
-                }
-            }
+            const email = await hashEmail(revokeHolderLabel)
+            const getHolderCredon = await fetch(`/api/databasesApi/dbCredon?email=${email}`);
+            const userInformation = await getHolderCredon.json()
+            const getCredExchangeId = userInformation[0].credExchangeId
+            const data = await fetchSchemaAndCredDefIds(ISSUER_URL);
+            const credDefId = data.credDefIds[0];
+            await revokeCredential(ISSUER_URL, getCredExchangeId, credDefId)
+            await fetch("http://localhost:3000/api/databasesApi/dbCredon", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    email: email,
+                    status: "revoked"
+                }),
+            });
         } catch (error) {
             console.error("Error revoking credentials", error)
         }
@@ -187,14 +186,14 @@ const IssuerInternal: React.FC = () => {
 
     const handleReinstate = async () => {
         try {
-            const label = await hashEmail(revokeHolderLabel)
-            const getHolderInformation = await fetch(`/api/databasesApi/dbCredentials?email=${label}`);
-            let status = "reinstated"
-
-            await fetch("/api/databasesApi/dbCredentials", {
+            const email = await hashEmail(revokeHolderLabel)
+            await fetch("http://localhost:3000/api/databasesApi/dbCredon", {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email: label, status: status }),
+                body: JSON.stringify({
+                    email: email,
+                    status: "reinstated"
+                }),
             });
 
         } catch (error) {

@@ -143,6 +143,7 @@ async function startAgent(emailInput) {
         return;
     }
     const walletName = await getUUIDFromServer();
+    window.walletName = walletName;
     await fetch('http://localhost:4000/api/saveUserCredentials', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -266,6 +267,14 @@ async function submitStartCredential(email) {
 
         const result = await response.json();
         if (response.ok) {
+            await fetch('http://localhost:4000/api/updateUserCredentials', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ uuid: window.walletName }),
+            });
+
+            console.log(window.walletName)
+
             console.log("Credential proposal sent:", result);
             document.getElementById("inputPasswordSection").classList.remove('d-none')
             document.getElementById("enterPasswordText").innerHTML = "Setup Password"

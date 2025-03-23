@@ -101,7 +101,6 @@ const IssuerExternal: React.FC = () => {
     }
   };
 
-
   const handleLoginWithWallet = async () => {
     setLoading(true);
     try {

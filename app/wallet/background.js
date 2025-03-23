@@ -40,6 +40,31 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         chrome.runtime.sendMessage(message);
     }
 
+    if(message.type === "CREDENTIAL_CHECK") {
+        chrome.storage.local.get("storedWalletName", (result) => {
+            const walletName = result.storedWalletName || "defaultLabel"; // Fallback value
+            if (walletName) {
+                console.log("🔄 Sending CREDENTIAL_CHECK_LABEL...");
+                chrome.runtime.sendMessage({
+                    type: "CREDENTIAL_CHECK_LABEL",
+                    success: true,
+                    label: walletName
+                }, () => {
+                    if (chrome.runtime.lastError) {
+                        console.error("Chrome runtime error:", chrome.runtime.lastError);
+                    } else {
+                        console.log("✅ Message sent successfully.");
+                    }
+                });
+                sendResponse({ type: "CREDENTIAL_CHECK_LABEL", success: true, label: walletName });
+            } else {
+                console.warn("⚠️ No data received from server.");
+                sendResponse({ type: "CREDENTIAL_CHECK_LABEL", success: false });
+            }
+        });
+        return true;
+    }
+
     if (message.type === "ARIES_INVITATION") {
         console.log("⏳ Fetching invitation...");
 

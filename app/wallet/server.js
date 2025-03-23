@@ -1,7 +1,7 @@
 import express from 'express'; // ES module import
 import cors from 'cors'; // ES module import
 import { exec } from 'child_process'; // ES module import
-import { getConnections, fetchSchemaAndCredDefIds, getWalletCredentialId, getPresentProof, deleteWalletCredential } from '../api/helper/helper.ts';
+import { getConnections, fetchSchemaAndCredDefIds, getWalletCredentialId, getPresentProof, deleteWalletCredential, getIssueCredential, deleteIssueCredential } from '../api/helper/helper.ts';
 import { createInvitation } from '../api/invitation/createInvitation.ts'; // Import with .ts extension
 import { acceptInvitation } from '../api/invitation/acceptInvitation.ts'; // Import with .ts extension
 import { sendCredentialProposal } from '../api/issueCredentials/sendProposal/sendProposal.ts';
@@ -382,7 +382,6 @@ app.get('/generate-uuid', (req, res) => {
 app.post('/api/saveUserCredentials', async (req, res) => {
     try {
         const { uuid, email } = req.body;
-
         await fetch("http://localhost:3000/api/databasesApi/dbCredon", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -394,6 +393,37 @@ app.post('/api/saveUserCredentials', async (req, res) => {
 
         console.log(`Saving UUID: ${uuid}, Email: ${email}`);
 
+        res.status(200).json({ message: 'Credentials saved successfully' });
+    } catch (error) {
+        console.error('Error saving credentials:', error);
+        res.status(500).json({ error: 'Failed to save credentials' });
+    }
+});
+
+app.post('/api/updateUserCredentials', async (req, res) => {
+    try {
+        const { uuid } = req.body;
+        const connections = await getConnections(ISSUER_URL);
+        const getIssuerConnections = connections.filter((connection) => connection.their_label === uuid);
+        const getIssuerConnectionId = getIssuerConnections[0].connection_id;
+
+        const issueCredentialsRecord = await getIssueCredential(ISSUER_URL);
+        const matchingRecord = issueCredentialsRecord.find(
+            (c) => c.cred_ex_record.connection_id === getIssuerConnectionId
+        );
+        const getCredExchangeId = matchingRecord.cred_ex_record.cred_ex_id;
+
+        await fetch("http://localhost:3000/api/databasesApi/dbCredon", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                label: uuid, 
+                connectionId: getIssuerConnectionId,
+                credExchangeId: getCredExchangeId,
+            }),
+        });
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        await deleteIssueCredential(ISSUER_URL, getCredExchangeId)
         res.status(200).json({ message: 'Credentials saved successfully' });
     } catch (error) {
         console.error('Error saving credentials:', error);
