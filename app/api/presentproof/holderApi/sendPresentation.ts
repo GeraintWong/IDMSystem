@@ -29,6 +29,7 @@ export const sendPresentation = async (credentialId: string) => {
         }
 
         const requestedAttributes = proofRequest.by_format?.pres_request?.indy?.requested_attributes || {};
+        const requestedPredicates = proofRequest.by_format?.pres_request?.indy?.requested_predicates || {};
 
         const requestedAttributesPayload = Object.keys(requestedAttributes).reduce((acc, key) => {
             acc[key] = {
@@ -38,10 +39,18 @@ export const sendPresentation = async (credentialId: string) => {
             return acc;
         }, {} as Record<string, { cred_id: string; revealed: boolean }>);
 
+        const requestedPredicatesPayload = Object.keys(requestedPredicates).reduce((acc, key) => {
+            acc[key] = {
+                cred_id: credentialId,
+            };
+            return acc;
+        }, {} as Record<string, { cred_id: string }>);
+        
+
         const presentationHolder = {
             indy: {
                 requested_attributes: requestedAttributesPayload,
-                requested_predicates: {}, 
+                requested_predicates: requestedPredicatesPayload, 
                 self_attested_attributes: {},
                 trace: true
             },

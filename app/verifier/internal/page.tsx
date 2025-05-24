@@ -70,14 +70,31 @@ export default function ProofRequestPage() {
     // Save selected attributes to the database
     const confirmSelectedAttributes = async () => {
         try {
+            const payload: any = {
+                label: "Verifier1",
+                credDefId,
+            };
+
+            const filteredAttributes = tempSelectedAttributes.filter(attr => attr !== "age");
+            if (filteredAttributes.length > 0) {
+                payload.attributes = filteredAttributes;
+            }
+
+            if (useAgePredicate) {
+                console.log("AlL I WANNA DO " + agePredicateType + ageValue);
+                payload.predicates = {
+                    attribute: "age",
+                    operation: agePredicateType,
+                    p_value: ageValue,
+                };
+            }
+
+            console.log(agePredicateType + ageValue)
+
             const response = await fetch("/api/databasesApi/dbProofConfig", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    label: "Verifier1",
-                    credDefId,
-                    attributes: tempSelectedAttributes
-                }),
+                body: JSON.stringify(payload),
             });
 
             if (!response.ok) throw new Error("Failed to save config");
@@ -124,7 +141,7 @@ export default function ProofRequestPage() {
                     >
                         Fetch Attributes
                     </button>
-                    
+
                     {tempSelectedAttributes.includes("age") && (
                         <div className="mt-4">
                             <h3 className="text-gray-600 font-semibold mb-1">Age Predicate:</h3>

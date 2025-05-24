@@ -58,7 +58,14 @@ const VerifierExternal: React.FC = () => {
 
             if (getAttributesCredDefId && getAttributesCredDefId.length > 0) {
               const latestConfig = getAttributesCredDefId[getAttributesCredDefId.length - 1]; // Get the latest saved config
-              await sendProofRequest(VERIFIER_URL, connectionId, "Proof", latestConfig.attributes, latestConfig.credDefId);
+              const formattedPredicates = {
+                ["Age"]: {
+                  name: latestConfig.predicates.attribute,
+                  p_type: latestConfig.predicates.operation,
+                  p_value: latestConfig.predicates.p_value,
+                }
+              };
+              await sendProofRequest(VERIFIER_URL, connectionId, "Proof", latestConfig.attributes, latestConfig.credDefId, formattedPredicates);
             }
             window.postMessage({ type: "ARIES_PROOF_REQUEST" });
 

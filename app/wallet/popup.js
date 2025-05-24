@@ -46,7 +46,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     document.getElementById('setupSection')?.classList.add('d-none');
                     document.getElementById('inputDetailsSection')?.classList.add('d-none');
 
-                    return; 
+                    return;
                 }
 
             }
@@ -346,36 +346,59 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     attributesDiv.appendChild(p);
                 });
 
+                Object.entries(data.requestedPredicates).forEach(([key, value]) => {
+                    const { name, p_type, p_value } = value; // destructure from the value object
+
+                    const p = document.createElement("p");
+                    const capitalizedKey = name.charAt(0).toUpperCase() + name.slice(1);
+
+                    // Set the full text including name, p_type, p_value
+                    p.innerText = `${capitalizedKey} ${p_type} ${p_value}`;
+
+                    attributesDiv.appendChild(p);
+                });
+
                 // Confirm button event listener
                 document.getElementById("confirmShare").onclick = async () => {
                     console.log("✅ Final confirmation given, sending presentation...");
 
                     // Send the proof presentation
-                    await fetch("http://localhost:4000/send-presentation", {
+                    const presentationResponse = await fetch("http://localhost:4000/send-presentation", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ userConfirmed: true })
                     });
 
-                    console.log("✅ Presentation sent.");
-                    alert("Credential shared successfully!");
-                    const response = await fetch('http://localhost:4000/get-wallet-credentials');
-                    if (!response.ok) throw new Error(`Server error: ${response.status}`);
-
-                    const walletData = await response.json();
-                    const walletSection = document.getElementById('walletDetailsSection');
-                    if (!walletSection) throw new Error("❌ Element 'walletDetailsSection' not found!");
-
-                    walletSection.classList.remove('d-none');
-                    walletSection.innerHTML = "<h3>Verified Credentials</h3>";
-
-                    walletData.WalletCredentials.forEach(cred => {
-                        walletSection.innerHTML += `
-                        <p><strong><small>Credential:</small></strong> <small>${cred.cred_def_name}</small><br> 
-                           <strong><small>Credential ID:</small></strong> <small>${cred.referent}</small></p>
-                        <hr>`;
-                    });
-                    document.getElementById("proofRequestSection").classList.add('d-none');
+                    if (!presentationResponse.ok) {
+                        document.getElementById("proofRequestSection").classList.add('d-none');
+                        document.getElementById('rejectCredentialSection').innerHTML = `
+                        <div class="alert alert-danger text-center" role="alert">
+                            <strong>Predicate is not satisfied</strong><br>
+                            Your credential is <strong>restricted</strong> from accesing.
+                        </div>`;
+                        // Ensure the section is visible
+                        document.getElementById('rejectCredentialSection').classList.remove('d-none');
+                    } else {
+                        console.log("✅ Presentation sent.");
+                        alert("Credential shared successfully!");
+                        const response = await fetch('http://localhost:4000/get-wallet-credentials');
+                        if (!response.ok) throw new Error(`Server error: ${response.status}`);
+    
+                        const walletData = await response.json();
+                        const walletSection = document.getElementById('walletDetailsSection');
+                        if (!walletSection) throw new Error("❌ Element 'walletDetailsSection' not found!");
+    
+                        walletSection.classList.remove('d-none');
+                        walletSection.innerHTML = "<h3>Verified Credentials</h3>";
+    
+                        walletData.WalletCredentials.forEach(cred => {
+                            walletSection.innerHTML += `
+                            <p><strong><small>Credential:</small></strong> <small>${cred.cred_def_name}</small><br> 
+                               <strong><small>Credential ID:</small></strong> <small>${cred.referent}</small></p>
+                            <hr>`;
+                        });
+                        document.getElementById("proofRequestSection").classList.add('d-none');
+                    }
                 };
 
                 // Reject button event listener
@@ -394,7 +417,7 @@ fetchSchemaAndCredDefIds();
 function maskEmail(email) {
     const parts = email.split("@");
     if (parts.length !== 2) {
-        return email; 
+        return email;
     }
 
     const username = parts[0];
@@ -402,9 +425,9 @@ function maskEmail(email) {
 
     let maskedUsername = "";
     if (username.length <= 3) {
-        maskedUsername = username.slice(0, 1) + "***"; 
+        maskedUsername = username.slice(0, 1) + "***";
     } else {
-        maskedUsername = username.slice(0, 2) + "***" + username.slice(-2); 
+        maskedUsername = username.slice(0, 2) + "***" + username.slice(-2);
     }
 
     return maskedUsername + "@" + domain;
@@ -490,8 +513,8 @@ async function hashPassword(password, salt = null) {
     const derivedBits = await crypto.subtle.deriveBits(
         {
             name: "PBKDF2",
-            salt: new TextEncoder().encode(salt), 
-            iterations: 100000, 
+            salt: new TextEncoder().encode(salt),
+            iterations: 100000,
             hash: "SHA-256"
         },
         key,
@@ -501,7 +524,7 @@ async function hashPassword(password, salt = null) {
     const hashArray = Array.from(new Uint8Array(derivedBits));
     const hash = hashArray.map(byte => byte.toString(16).padStart(2, "0")).join("");
 
-    return { hash, salt }; 
+    return { hash, salt };
 }
 
 
@@ -518,7 +541,7 @@ async function verifyPassword(inputPassword) {
         chrome.storage.local.get(["passwordHash", "passwordSalt"], async (data) => {
             if (!data.passwordHash || !data.passwordSalt) {
                 console.log("No password set.");
-                resolve(false); 
+                resolve(false);
                 return;
             }
 
@@ -526,11 +549,11 @@ async function verifyPassword(inputPassword) {
 
             if (inputHash === data.passwordHash) {
                 console.log("✅ Access Granted!");
-                resolve(true);  
+                resolve(true);
             } else {
                 alert("Password incorrect")
                 console.log("❌ Incorrect Password!");
-                resolve(false); 
+                resolve(false);
             }
         });
     });
@@ -544,7 +567,7 @@ async function loginSuccess() {
 
 async function checkLoginStatus() {
     const session = await chrome.storage.session.get("session_wallet");
-    return !!session.session_wallet; 
+    return !!session.session_wallet;
 }
 
 // Helper function to retrieve stored password hash and salt
@@ -569,7 +592,7 @@ async function hashEmail(email) {
     const data = encoder.encode(email);
 
     try {
-        const hashBuffer = await crypto.subtle.digest("SHA-256", data); 
+        const hashBuffer = await crypto.subtle.digest("SHA-256", data);
         const hashArray = Array.from(new Uint8Array(hashBuffer));
         const hashHex = hashArray
             .map((b) => b.toString(16).padStart(2, "0"))
@@ -577,14 +600,14 @@ async function hashEmail(email) {
         return hashHex;
     } catch (error) {
         console.error("Hashing error:", error);
-        throw error; 
+        throw error;
     }
 }
 
 //UUID stuff
 async function getUUIDFromServer() {
     try {
-        const response = await fetch('http://localhost:4000/generate-uuid'); 
+        const response = await fetch('http://localhost:4000/generate-uuid');
         const data = await response.json();
         return data.uuid;
     } catch (error) {

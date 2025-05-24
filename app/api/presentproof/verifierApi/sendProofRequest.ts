@@ -9,8 +9,6 @@ export const sendProofRequest = async (
             name: string;
             p_type: string; 
             p_value: number | string; 
-            cred_def_id: string;
-            non_revoked?: { to: number };
         };
     } = {}, 
 ) => {
@@ -40,7 +38,7 @@ export const sendProofRequest = async (
             p_type: predicate.p_type,
             p_value: predicate.p_value,
             restrictions: [{ cred_def_id: credDefId }],
-            non_revoked: predicate.non_revoked || { to: Math.floor(Date.now() / 1000) },
+            non_revoked: { to: Math.floor(Date.now() / 1000) },
         };
         return acc;
     }, {} as Record<string, any>);

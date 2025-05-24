@@ -236,6 +236,7 @@ app.post("/send-presentation", async (req, res) => {
         }
 
         const requestedAttributes = proofRequest.by_format?.pres_request?.indy?.requested_attributes;
+        const requestedPredicates = proofRequest.by_format?.pres_request?.indy.requested_predicates;
         let matchedCredential = null; 
 
         if (requestedAttributes) {
@@ -260,6 +261,7 @@ app.post("/send-presentation", async (req, res) => {
             return res.status(200).json({
                 message: "User confirmation required.",
                 requestedAttributes,
+                requestedPredicates,
                 credentialId: matchedCredential.referent
             });
         }
