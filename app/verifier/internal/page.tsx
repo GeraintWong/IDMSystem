@@ -6,6 +6,9 @@ export default function ProofRequestPage() {
     const [attributes, setAttributes] = useState<string[]>([]);
     const [tempSelectedAttributes, setTempSelectedAttributes] = useState<string[]>([]);
     const [selectedAttributes, setSelectedAttributes] = useState<string[]>([]);
+    const [useAgePredicate, setUseAgePredicate] = useState(false);
+    const [agePredicateType, setAgePredicateType] = useState(">=");
+    const [ageValue, setAgeValue] = useState(18); // Default age value
 
     // Load saved attributes and credDefId from the database
     useEffect(() => {
@@ -54,11 +57,14 @@ export default function ProofRequestPage() {
 
     // Handle checkbox selection (temporary)
     const handleTempAttributeToggle = (attribute: string) => {
-        setTempSelectedAttributes((prev) =>
-            prev.includes(attribute)
+        setTempSelectedAttributes((prev) => {
+            if (attribute === "age") {
+                setUseAgePredicate(!prev.includes(attribute)); // Toggle predicate based on 'age' selection
+            }
+            return prev.includes(attribute)
                 ? prev.filter(attr => attr !== attribute)
-                : [...prev, attribute]
-        );
+                : [...prev, attribute];
+        });
     };
 
     // Save selected attributes to the database
@@ -118,6 +124,38 @@ export default function ProofRequestPage() {
                     >
                         Fetch Attributes
                     </button>
+                    
+                    {tempSelectedAttributes.includes("age") && (
+                        <div className="mt-4">
+                            <h3 className="text-gray-600 font-semibold mb-1">Age Predicate:</h3>
+                            <div className="flex items-center space-x-2 mb-2">
+                                <label htmlFor="agePredicateType" className="text-gray-700">Type:</label>
+                                <select
+                                    id="agePredicateType"
+                                    className="border p-1 rounded-md"
+                                    value={agePredicateType}
+                                    onChange={(e) => setAgePredicateType(e.target.value)}
+                                >
+                                    <option value=">=">Greater than or equal to</option>
+                                    <option value=">">Greater than</option>
+                                    <option value="<=">Less than or equal to</option>
+                                    <option value="<">Less than</option>
+                                    <option value="=">Equal to</option>
+                                    <option value="!=">Not equal to</option>
+                                </select>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <label htmlFor="ageValue" className="text-gray-700">Value:</label>
+                                <input
+                                    type="number"
+                                    id="ageValue"
+                                    className="border p-1 rounded-md w-20"
+                                    value={ageValue}
+                                    onChange={(e) => setAgeValue(Number(e.target.value))}
+                                />
+                            </div>
+                        </div>
+                    )}
 
                     {attributes.length > 0 && (
                         <div className="mb-4">

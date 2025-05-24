@@ -105,8 +105,6 @@ const OCRExternal: React.FC = () => {
 
                 // Delete proof record after successful verification
                 await deletePresentProof(ISSUER_URL, presExId);
-                await deleteConnections(ISSUER_URL, connectionId)
-
                 // Redirect to verifiedWebsite.tsx
                 router.push("/issuerOCRCredential/OCR");
               }

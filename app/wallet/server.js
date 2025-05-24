@@ -60,10 +60,8 @@ app.post('/start-agent', async (req, res) => {
             return res.status(500).json({ message: 'Failed to start Aries agent' });
         }
 
-        // Add timeout of 10 seconds
         setTimeout(async () => {
             try {
-                // Create the invitation after the timeout
                 const invitationUrl = await createInvitation(ISSUER_URL);
                 if (!invitationUrl) {
                     return res.status(500).json({ message: 'Failed to create invitation' });
@@ -72,7 +70,6 @@ app.post('/start-agent', async (req, res) => {
                 const decodedUrl = decodeURIComponent(invitationUrl.split("oob=")[1]);
                 const invitationData = JSON.parse(atob(decodedUrl));
 
-                // Accept the invitation with the agent
                 const connectionSuccessful = await acceptInvitation(HOLDER_URL, invitationData);
                 if (connectionSuccessful) {
                     console.log('Connection successfully established with the issuer.');
@@ -84,13 +81,12 @@ app.post('/start-agent', async (req, res) => {
                 console.error('Error during connection setup:', connectionError);
                 return res.status(500).json({ message: 'Failed to complete connection setup' });
             }
-        }, 5000); // Timeout after 10 seconds
+        }, 5000); 
     });
 });
-// Replace this with your actual logic to check agent connection
+
 app.get('/check-connection', async (req, res) => {
     try {
-        // Fetch current connections from the Aries agent API using getConnections
         const connections = await getConnections(HOLDER_URL);
 
         // Filter active connections
@@ -115,7 +111,6 @@ app.get('/check-connection', async (req, res) => {
 
 app.get('/get-schema-and-cred-def-ids', async (req, res) => {
     try {
-        // Fetch schema and credential definition IDs from the Aries agent or database
         const data = await fetchSchemaAndCredDefIds(ISSUER_URL);
 
         return res.json({
@@ -129,7 +124,7 @@ app.get('/get-schema-and-cred-def-ids', async (req, res) => {
     }
 });
 
-const proposals = []; // Declare proposals array to store proposals
+const proposals = [];
 
 app.post('/send-credential-proposal', async (req, res) => {
     const { connectionId, credAttrs, comment, autoRemove, schemaId, credDefId } = req.body;
@@ -156,7 +151,7 @@ app.get("/get-proposals", (req, res) => {
 
 app.get('/get-wallet-credentials', async (req, res) => {
     try {
-        const credentials = await getWalletCredentialId(HOLDER_URL); // Await the async function
+        const credentials = await getWalletCredentialId(HOLDER_URL); 
 
         if (!credentials || credentials.length === 0) {
             return res.status(404).json({ message: "No wallet credentials found" });
@@ -168,7 +163,6 @@ app.get('/get-wallet-credentials', async (req, res) => {
             return parts.length > 4 ? parts[4].replace(/_/g, " ") : "Unknown";
         }
 
-        // Map credentials to include extracted names
         const formattedCredentials = credentials.map(cred => ({
             referent: cred.referent,
             cred_def_id: cred.cred_def_id,
@@ -224,19 +218,16 @@ app.post("/send-presentation", async (req, res) => {
     try {
         const { userConfirmed } = req.body;
 
-        // Fetch all present-proof requests
         const proofs = await getPresentProof(HOLDER_URL);
         if (!proofs || proofs.length === 0) {
             return res.status(404).json({ message: "No proof requests found." });
         }
 
-        // Find a valid proof request
         const proofRequest = proofs.find(p => p.state === "request-received");
         if (!proofRequest) {
             return res.status(400).json({ message: "No valid proof request found." });
         }
 
-        // Fetch wallet credentials
         const walletResponse = await fetch("http://localhost:4000/get-wallet-credentials");
         const walletData = await walletResponse.json();
 
@@ -245,12 +236,12 @@ app.post("/send-presentation", async (req, res) => {
         }
 
         const requestedAttributes = proofRequest.by_format?.pres_request?.indy?.requested_attributes;
-        let matchedCredential = null; // Declare outside to avoid undefined error
+        let matchedCredential = null; 
 
         if (requestedAttributes) {
             const credDefIds = Object.values(requestedAttributes)
                 .map(attr => attr.restrictions?.[0]?.cred_def_id)
-                .filter(Boolean); // Remove undefined values
+                .filter(Boolean); 
 
             console.log("Requested Credential Definition IDs:", credDefIds);
 
@@ -261,12 +252,10 @@ app.post("/send-presentation", async (req, res) => {
             console.log("No requested attributes found in proof request.");
         }
 
-        // Ensure matchedCredential is valid
         if (!matchedCredential) {
             return res.status(400).json({ message: "No matching credential found." });
         }
 
-        // Step 1: If the user has NOT confirmed yet, return the requested attributes for review
         if (!userConfirmed) {
             return res.status(200).json({
                 message: "User confirmation required.",
@@ -275,7 +264,6 @@ app.post("/send-presentation", async (req, res) => {
             });
         }
 
-        // Step 2: If userConfirmed is true, send the presentation
         const response = await sendPresentation(matchedCredential.referent);
 
         if (!response) {
@@ -338,7 +326,6 @@ const transporter = nodemailer.createTransport({
         if (status === "revoked") {
             console.log(`🔴 Credential revoked: ${cred_def_id}, Reason: ${reason}`);
 
-            // Fetch wallet credentials
             const walletResponse = await fetch("http://localhost:4000/get-wallet-credentials");
             
             if (!walletResponse.ok) {
@@ -348,11 +335,10 @@ const transporter = nodemailer.createTransport({
             const walletData = await walletResponse.json();
             console.log("🔍 Wallet Data:", walletData);
 
-            // Find the matching credential in the wallet
             const matchingCredential = walletData.WalletCredentials.find(cred => cred.cred_def_id === cred_def_id);
 
             if (matchingCredential) {
-                console.log("✅ Matching Credential Found:", matchingCredential);
+                console.log("Matching Credential Found:", matchingCredential);
                 const referentId = matchingCredential.referent
                 const deleteResponse = await deleteWalletCredential(HOLDER_URL, referentId);
 

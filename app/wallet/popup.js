@@ -46,7 +46,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     document.getElementById('setupSection')?.classList.add('d-none');
                     document.getElementById('inputDetailsSection')?.classList.add('d-none');
 
-                    return; // ✅ Exit early since credentials exist
+                    return; 
                 }
 
             }
@@ -301,7 +301,7 @@ async function submitStartCredential(email) {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     setTimeout(async () => {
         if (message.type === "ARIES_PROOF_REQUEST") {
-            console.log("📩 Proof request received in popup!");
+            console.log("Proof request received in popup!");
 
             // Show popup
             document.getElementById("signingInSectionId").classList.add('d-none')
@@ -332,7 +332,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             }
 
             const data = await response.json();
-            console.log("📥 Requested Attributes:", data);
+            console.log("Requested Attributes:", data);
 
             if (data.message === "User confirmation required.") {
                 // Display requested attributes
@@ -394,7 +394,7 @@ fetchSchemaAndCredDefIds();
 function maskEmail(email) {
     const parts = email.split("@");
     if (parts.length !== 2) {
-        return email; // Invalid email format, return original
+        return email; 
     }
 
     const username = parts[0];
@@ -402,9 +402,9 @@ function maskEmail(email) {
 
     let maskedUsername = "";
     if (username.length <= 3) {
-        maskedUsername = username.slice(0, 1) + "***"; // Show first letter, mask the rest
+        maskedUsername = username.slice(0, 1) + "***"; 
     } else {
-        maskedUsername = username.slice(0, 2) + "***" + username.slice(-2); // Show first and last two letters, mask middle
+        maskedUsername = username.slice(0, 2) + "***" + username.slice(-2); 
     }
 
     return maskedUsername + "@" + domain;
@@ -414,7 +414,6 @@ function maskEmail(email) {
 document.getElementById("submitPasswordButton").addEventListener("click", async () => {
     const password = document.getElementById("passwordInput").value;
 
-    // Check if a password has been set
     const storedData = await getStoredPasswordData();
 
     if (!storedData.passwordHash || !storedData.passwordSalt) {
@@ -426,7 +425,6 @@ document.getElementById("submitPasswordButton").addEventListener("click", async 
 
         const walletData = await response.json();
 
-        // ✅ Ensure `WalletCredentials` exists and is an array
         if (Array.isArray(walletData.WalletCredentials) && walletData.WalletCredentials.length > 0) {
             const walletSection = document.getElementById('walletDetailsSection');
             if (!walletSection) throw new Error("❌ Element 'walletDetailsSection' not found!");
@@ -451,7 +449,6 @@ document.getElementById("submitPasswordButton").addEventListener("click", async 
 
             const walletData = await response.json();
 
-            // ✅ Ensure `WalletCredentials` exists and is an array
             if (Array.isArray(walletData.WalletCredentials) && walletData.WalletCredentials.length > 0) {
                 const walletSection = document.getElementById('walletDetailsSection');
                 if (!walletSection) throw new Error("❌ Element 'walletDetailsSection' not found!");
@@ -473,18 +470,15 @@ document.getElementById("submitPasswordButton").addEventListener("click", async 
 });
 
 async function hashPassword(password, salt = null) {
-    // Generate a random 16-byte salt if none is provided
     if (!salt) {
         const saltArray = new Uint8Array(16);
         crypto.getRandomValues(saltArray);
         salt = Array.from(saltArray).map(byte => byte.toString(16).padStart(2, "0")).join("");
     }
 
-    // Encode password
     const encoder = new TextEncoder();
     const passwordBuffer = encoder.encode(password);
 
-    // Import the password as a key
     const key = await crypto.subtle.importKey(
         "raw",
         passwordBuffer,
@@ -493,23 +487,21 @@ async function hashPassword(password, salt = null) {
         ["deriveBits"]
     );
 
-    // Derive a 256-bit key using PBKDF2 with SHA-256
     const derivedBits = await crypto.subtle.deriveBits(
         {
             name: "PBKDF2",
-            salt: new TextEncoder().encode(salt), // Use stored salt
-            iterations: 100000, // Increase to make brute-force harder
+            salt: new TextEncoder().encode(salt), 
+            iterations: 100000, 
             hash: "SHA-256"
         },
         key,
         256
     );
 
-    // Convert derivedBits to hex string
     const hashArray = Array.from(new Uint8Array(derivedBits));
     const hash = hashArray.map(byte => byte.toString(16).padStart(2, "0")).join("");
 
-    return { hash, salt }; // Return both hash and salt
+    return { hash, salt }; 
 }
 
 
@@ -526,20 +518,19 @@ async function verifyPassword(inputPassword) {
         chrome.storage.local.get(["passwordHash", "passwordSalt"], async (data) => {
             if (!data.passwordHash || !data.passwordSalt) {
                 console.log("No password set.");
-                resolve(false); // No password stored, cannot verify
+                resolve(false); 
                 return;
             }
 
-            // Recompute the hash using the stored salt
             const { hash: inputHash } = await hashPassword(inputPassword, data.passwordSalt);
 
             if (inputHash === data.passwordHash) {
                 console.log("✅ Access Granted!");
-                resolve(true);  // Password correct
+                resolve(true);  
             } else {
                 alert("Password incorrect")
                 console.log("❌ Incorrect Password!");
-                resolve(false); // Password incorrect
+                resolve(false); 
             }
         });
     });
@@ -553,7 +544,7 @@ async function loginSuccess() {
 
 async function checkLoginStatus() {
     const session = await chrome.storage.session.get("session_wallet");
-    return !!session.session_wallet; // Returns true if session exists, false otherwise
+    return !!session.session_wallet; 
 }
 
 // Helper function to retrieve stored password hash and salt
@@ -578,7 +569,7 @@ async function hashEmail(email) {
     const data = encoder.encode(email);
 
     try {
-        const hashBuffer = await crypto.subtle.digest("SHA-256", data); // Use SHA-256 (or better)
+        const hashBuffer = await crypto.subtle.digest("SHA-256", data); 
         const hashArray = Array.from(new Uint8Array(hashBuffer));
         const hashHex = hashArray
             .map((b) => b.toString(16).padStart(2, "0"))
@@ -586,14 +577,14 @@ async function hashEmail(email) {
         return hashHex;
     } catch (error) {
         console.error("Hashing error:", error);
-        throw error; // Rethrow the error to be handled by the caller
+        throw error; 
     }
 }
 
 //UUID stuff
 async function getUUIDFromServer() {
     try {
-        const response = await fetch('http://localhost:4000/generate-uuid'); // Replace with your server's URL
+        const response = await fetch('http://localhost:4000/generate-uuid'); 
         const data = await response.json();
         return data.uuid;
     } catch (error) {

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import nodemailer from "nodemailer";
-import { otpStore } from "../otpStore"; // ✅ Shared storage (temporary)
+import { otpStore } from "../otpStore"; 
 
 const generateOTP = (): number => Math.floor(100000 + Math.random() * 900000);
 
@@ -12,7 +12,7 @@ export async function POST(req: Request) {
         }
 
         const otp = generateOTP();
-        otpStore[email] = otp; // ✅ Store OTP in shared storage
+        otpStore[email] = otp; 
         console.log(`Before storing OTP - Email: ${email}, Generated OTP: ${otp}`);
         console.log(`After storing OTP - ${email}: ${otpStore[email]}`);
 

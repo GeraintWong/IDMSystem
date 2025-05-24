@@ -104,6 +104,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             sendResponse({ type: "ARIES_CONNECTION_RESULT", success: false, error: error.message });
         });
 
-        return true; // ✅ Keep the function alive until `sendResponse` is called
+        return true;
     }
 });

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { otpStore } from "../otpStore"; // ✅ Import shared OTP store
+import { otpStore } from "../otpStore"; 
 
 export async function POST(req: Request) {
   try {
@@ -12,7 +12,7 @@ export async function POST(req: Request) {
     console.log(`Stored OTP: ${otpStore[email]}, User Input OTP: ${otp}`);
 
     if (otpStore[email] && otpStore[email] === parseInt(otp)) {
-      delete otpStore[email]; // ✅ Remove OTP after successful verification
+      delete otpStore[email];
       return NextResponse.json({ message: "OTP verified successfully!" }, { status: 200 });
     } else {
       return NextResponse.json({ error: "Invalid OTP" }, { status: 400 });

@@ -4,6 +4,15 @@ export const sendProofRequest = async (
     proofRequestName: string,
     attributes: string[],
     credDefId: string,
+    predicates: {
+        [key: string]: {
+            name: string;
+            p_type: string; 
+            p_value: number | string; 
+            cred_def_id: string;
+            non_revoked?: { to: number };
+        };
+    } = {}, 
 ) => {
     if (attributes.length === 0) {
         console.error("No attributes selected.");
@@ -24,6 +33,18 @@ export const sendProofRequest = async (
         return acc;
     }, {} as Record<string, any>);
 
+    const requested_predicates = Object.keys(predicates).reduce((acc, key) => {
+        const predicate = predicates[key];
+        acc[key] = {
+            name: predicate.name,
+            p_type: predicate.p_type,
+            p_value: predicate.p_value,
+            restrictions: [{ cred_def_id: credDefId }],
+            non_revoked: predicate.non_revoked || { to: Math.floor(Date.now() / 1000) },
+        };
+        return acc;
+    }, {} as Record<string, any>);
+
     const proofRequest = {
         comment: "Requesting proof dynamically",
         connection_id: connectionId,
@@ -32,7 +53,7 @@ export const sendProofRequest = async (
                 name: proofRequestName, 
                 version: "1.0", 
                 requested_attributes,
-                requested_predicates: {},
+                requested_predicates,
                 non_revoked: { to: Math.floor(Date.now() / 1000) }
             }
         }

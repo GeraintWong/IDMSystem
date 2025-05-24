@@ -7,7 +7,6 @@ export interface Connection {
 
 export const acceptInvitation = async (agentUrl: string, invitation: object): Promise<boolean> => {
   try {
-    // Accept the invitation
     const response = await fetch(`${agentUrl}/out-of-band/receive-invitation`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -18,30 +17,26 @@ export const acceptInvitation = async (agentUrl: string, invitation: object): Pr
       throw new Error(`Failed to accept invitation: ${response.statusText}`);
     }
 
-    // Wait for the connection to be created and fetch connections
     let connections = await getConnections(agentUrl);
     let connection = connections.find((c) => c.state === "response");
 
     if (connection) {
-      // Send trust ping immediately
       await sendTrustPing(agentUrl, connection.connection_id);
     }
 
-    // Retry logic: Ensure we fetch connections again and send ping if necessary
-    let retries = 3; // Maximum number of retries
+    let retries = 3; 
     while (retries > 0) {
-      // Fetch connections again in case state has been updated
       connections = await getConnections(agentUrl);
       connection = connections.find((c) => c.state === "response");
 
       if (connection) {
         await sendTrustPing(agentUrl, connection.connection_id);
-        return true; // Successfully sent trust ping and connection is active
+        return true; 
       }
 
       retries--;
       console.log("Retrying to send trust ping...");
-      await new Promise((resolve) => setTimeout(resolve, 2000)); // Wait 2 seconds before retrying
+      await new Promise((resolve) => setTimeout(resolve, 2000)); 
     }
 
     console.error("Failed to send trust ping after multiple attempts.");
@@ -52,7 +47,6 @@ export const acceptInvitation = async (agentUrl: string, invitation: object): Pr
   }
 };
 
-// Function to send a trust ping
 export const sendTrustPing = async (agentUrl: string, connectionId: string): Promise<void> => {
   try {
     await fetch(`${agentUrl}/connections/${connectionId}/send-ping`, {

@@ -8,7 +8,6 @@ export const revokeCredential = async (
   comment: string = ""
 ): Promise<boolean> => {
   try {
-      // Construct the request payload for revocation
       const revocationRequest = {
           cred_ex_id,
           publish,
@@ -17,7 +16,6 @@ export const revokeCredential = async (
           comment,
       };
 
-      // Step 1: Send request to revoke the credential
       const response = await fetch(`${agentUrl}/revocation/revoke`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -30,8 +28,7 @@ export const revokeCredential = async (
 
       console.log("Credential revoked successfully!");
 
-      // Step 2: Notify the wallet via webhook
-      const walletWebhookUrl = "http://localhost:4000/webhook"; // Your wallet webhook URL
+      const walletWebhookUrl = "http://localhost:4000/webhook"; 
       const webhookPayload = {
           cred_def_id: cred_def_id,
           status: "revoked",

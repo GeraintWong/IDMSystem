@@ -29,7 +29,6 @@ export interface CredentialProposal {
     credDefId: string,
   ): Promise<boolean> => {
     try {
-        // Construct credential proposal preview
       const credentialProposal: CredentialProposal = {
         connection_id: connectionId,
         comment,
@@ -38,7 +37,7 @@ export interface CredentialProposal {
           "@type": "issue-credential/2.0/credential-preview",
           attributes: Object.entries(credAttrs).map(([name, value]) => ({
             name,
-            mime_type: "plain/text", // Assuming mime-type as plain/text based on your original curl
+            mime_type: "plain/text", 
             value,
           })),
         },

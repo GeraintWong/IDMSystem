@@ -7,7 +7,7 @@ window.addEventListener("message", (event) => {
     }
 
     chrome.runtime.sendMessage(event.data, (response) => {
-        console.log("📨 Forwarding response from background:", response);
+        console.log("Forwarding response from background:", response);
         window.postMessage({ type: "ARIES_RESPONSE", data: response }, "*");
     });
 });
